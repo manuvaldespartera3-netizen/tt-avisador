@@ -1,1 +1,44 @@
+name: Avisador TT Cup
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"     # cada 5 minutos
+  workflow_dispatch:           # boton "Run workflow" para lanzarlo a mano
+
+concurrency:
+  group: avisador
+  cancel-in-progress: false
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Recuperar memoria (avisos ya enviados)
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+
+      - name: Ejecutar avisador
+        env:
+          ZYLA_API_KEY: ${{ secrets.ZYLA_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
+          TEST_MODE: ${{ vars.TEST_MODE || '1' }}
+        run: python tt_alerts.py
+
+      - name: Guardar memoria
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
 
