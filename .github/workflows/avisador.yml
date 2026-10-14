@@ -2,8 +2,8 @@ name: Avisador TT Cup
 
 on:
   schedule:
-    - cron: "*/5 * * * *"     # cada 5 minutos
-  workflow_dispatch:           # boton "Run workflow" para lanzarlo a mano
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
 concurrency:
   group: avisador
@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Recuperar memoria (avisos ya enviados)
+      - name: Recuperar memoria
         uses: actions/cache/restore@v4
         with:
           path: state.json
@@ -41,4 +41,3 @@ jobs:
         with:
           path: state.json
           key: state-${{ github.run_id }}
-
