@@ -1,0 +1,42 @@
+name: Historico TT Cup
+
+on:
+  workflow_dispatch:
+    inputs:
+      dias:
+        description: "Dias a analizar"
+        default: "90"
+
+permissions:
+  contents: write
+
+jobs:
+  historico:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Analizar historico
+        env:
+          ZYLA_API_KEY: ${{ secrets.ZYLA_API_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
+          BT_DAYS: ${{ github.event.inputs.dias || '90' }}
+        run: python tt_backtest.py
+
+      - name: Guardar resultados
+        if: always()
+        run: |
+          if [ -f backtest/informe_historico.txt ]; then
+            git config user.name "tt-avisador"
+            git config user.email "tt-avisador@users.noreply.github.com"
+            git add backtest/informe_historico.txt backtest/historico_picks.csv
+            git commit -m "Informe historico" || true
+            git pull --rebase || true
+            git push || true
+          fi
