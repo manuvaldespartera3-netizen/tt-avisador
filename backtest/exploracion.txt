@@ -1,0 +1,41 @@
+EXPLORACIÓN DE LIGAS
+
+🏓 TT Cup (id 15005) · últimos 4 días
+   806 partidos (201 al día)
+   Grupos todos-contra-todos: 3 jugadores ×50, 4 jugadores ×63
+   · Grupos de 3: 0 partidos extra ×47, 1 partidos extra ×3
+       después del grupo: 2.º vs 3.º en 3 de 50 grupos
+   · Grupos de 4: 0 partidos extra ×44, 1 partidos extra ×19
+       después del grupo: 3.º vs 4.º en 19 de 63 grupos
+   Horario: de 0:00 a 23:59
+
+🏓 Czech Liga Pro (id 19039) · últimos 4 días
+   595 partidos (148 al día)
+   Grupos todos-contra-todos: 3 jugadores ×31, 4 jugadores ×58
+   · Grupos de 3: 0 partidos extra ×30, 1 partidos extra ×1
+       después del grupo: 2.º vs 3.º en 1 de 31 grupos
+   · Grupos de 4: 0 partidos extra ×39, 1 partidos extra ×19
+       después del grupo: 3.º vs 4.º en 18 de 58 grupos
+       después del grupo: 2.º vs 4.º en 1 de 58 grupos
+   Horario: de 0:00 a 23:59
+
+🏓 TT Elite Series (id 19041) · últimos 4 días
+   1100 partidos (275 al día)
+   Grupos todos-contra-todos: 3 jugadores ×177
+   · Grupos de 3: 0 partidos extra ×174, 1 partidos extra ×3
+       después del grupo: 2.º vs 3.º en 2 de 177 grupos
+       después del grupo: 1.º vs 2.º en 1 de 177 grupos
+   Horario: de 0:00 a 23:59
+
+🏓 Setka Cup (id 15004) · últimos 4 días
+   1681 partidos (420 al día)
+   Grupos todos-contra-todos: 3 jugadores ×165, 4 jugadores ×63
+   · Grupos de 3: 0 partidos extra ×164, 1 partidos extra ×1
+       después del grupo: 1.º vs 2.º en 1 de 165 grupos
+   · Grupos de 4: 0 partidos extra ×26, 1 partidos extra ×37
+       después del grupo: 3.º vs 4.º en 28 de 63 grupos
+       después del grupo: 1.º vs 2.º en 5 de 63 grupos
+       después del grupo: 2.º vs 4.º en 2 de 63 grupos
+       después del grupo: 1.º vs 3.º en 1 de 63 grupos
+       después del grupo: 1.º vs 4.º en 1 de 63 grupos
+   Horario: de 0:00 a 23:59
