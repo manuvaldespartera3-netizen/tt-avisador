@@ -1,0 +1,78 @@
+[
+ [
+  {
+   "name": "Full time",
+   "choiceGroup": null,
+   "isLive": false,
+   "suspended": false,
+   "group": "Home/Away",
+   "period": "Match",
+   "choices": [
+    {
+     "name": "1",
+     "initialValue": {
+      "fractional": "2/9",
+      "decimal": 1.22,
+      "american": "-450"
+     },
+     "value": {
+      "fractional": "2/9",
+      "decimal": 1.22,
+      "american": "-450"
+     }
+    },
+    {
+     "name": "2",
+     "initialValue": {
+      "fractional": "3/1",
+      "decimal": 4,
+      "american": "+300"
+     },
+     "value": {
+      "fractional": "3/1",
+      "decimal": 4,
+      "american": "+300"
+     }
+    }
+   ]
+  }
+ ],
+ [
+  {
+   "name": "Full time",
+   "choiceGroup": null,
+   "isLive": false,
+   "suspended": false,
+   "group": "Home/Away",
+   "period": "Match",
+   "choices": [
+    {
+     "name": "1",
+     "initialValue": {
+      "fractional": "8/11",
+      "decimal": 1.73,
+      "american": "-138"
+     },
+     "value": {
+      "fractional": "8/11",
+      "decimal": 1.73,
+      "american": "-138"
+     }
+    },
+    {
+     "name": "2",
+     "initialValue": {
+      "fractional": "1/1",
+      "decimal": 2,
+      "american": "+100"
+     },
+     "value": {
+      "fractional": "1/1",
+      "decimal": 2,
+      "american": "+100"
+     }
+    }
+   ]
+  }
+ ]
+]
