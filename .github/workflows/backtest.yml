@@ -3,6 +3,15 @@ name: Historico TT Cup
 on:
   workflow_dispatch:
     inputs:
+      liga:
+        description: "Liga a analizar"
+        type: choice
+        default: "TT Cup"
+        options:
+          - "TT Cup"
+          - "Czech Liga Pro"
+          - "Setka Cup"
+          - "TT Elite Series"
       dias:
         description: "Dias a analizar"
         default: "90"
@@ -21,6 +30,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Elegir liga
+        run: |
+          case "${{ github.event.inputs.liga }}" in
+            "Czech Liga Pro")  echo "TT_TOURNAMENT_ID=19039" >> $GITHUB_ENV ;;
+            "Setka Cup")       echo "TT_TOURNAMENT_ID=15004" >> $GITHUB_ENV ;;
+            "TT Elite Series") echo "TT_TOURNAMENT_ID=19041" >> $GITHUB_ENV ;;
+            *)                 echo "TT_TOURNAMENT_ID=15005" >> $GITHUB_ENV ;;
+          esac
+
       - name: Analizar historico
         env:
           ZYLA_API_KEY: ${{ secrets.ZYLA_API_KEY }}
@@ -32,11 +50,9 @@ jobs:
       - name: Guardar resultados
         if: always()
         run: |
-          if [ -f backtest/informe_historico.txt ]; then
-            git config user.name "tt-avisador"
-            git config user.email "tt-avisador@users.noreply.github.com"
-            git add backtest/informe_historico.txt backtest/historico_picks.csv backtest/ejemplo_cuotas.json
-            git commit -m "Informe historico" || true
-            git pull --rebase || true
-            git push || true
-          fi
+          git config user.name "tt-avisador"
+          git config user.email "tt-avisador@users.noreply.github.com"
+          git add $(find backtest -path '*/cache' -prune -o -type f \( -name '*.txt' -o -name '*.csv' -o -name '*.json' \) -print) || true
+          git commit -m "Informe historico ${{ github.event.inputs.liga }}" || true
+          git pull --rebase || true
+          git push || true
