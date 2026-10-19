@@ -32,7 +32,12 @@ from tt_engine import Group, Match
 
 DAYS = int(os.getenv("BT_DAYS", "90"))
 WARMUP = int(os.getenv("BT_WARMUP", "45"))
-OUT = os.getenv("BT_OUT", "backtest")
+LIGAS = {"15005": "TT Cup", "19039": "Czech Liga Pro", "15004": "Setka Cup",
+         "19041": "TT Elite Series"}
+LIGA = LIGAS.get(str(TOURNAMENT_ID), str(TOURNAMENT_ID))
+# TT Cup en backtest/ (como siempre); las demas ligas en su propia carpeta
+OUT = os.getenv("BT_OUT", "backtest" if str(TOURNAMENT_ID) == "15005"
+                else f"backtest/{LIGA.lower().replace(' ', '_')}")
 TG = os.getenv("TELEGRAM_TOKEN", "").strip()
 CHAT = os.getenv("MY_CHAT_ID", "").strip()
 CACHE = os.path.join(OUT, "cache")
@@ -461,7 +466,7 @@ def report(rows, info):
     half = fechas[len(fechas) // 2] if fechas else ""
     split = fechas[int(len(fechas) * 0.6)] if fechas else ""
     L = []
-    L.append("INFORME HISTÓRICO TT CUP")
+    L.append(f"INFORME HISTÓRICO {LIGA.upper()}")
     L.append(f"Periodo: {info['desde']} a {info['hasta']} · {info['grupos']} grupos analizados"
              f" · {info['dudosos']} descartados por datos dudosos")
     L.append("")
@@ -521,7 +526,7 @@ def verdict(rows):
 
 
 def telegram_summary(rows, info):
-    L = [f"📈 HISTÓRICO TT CUP ({info['desde'].strftime('%d/%m')}–{info['hasta'].strftime('%d/%m')})",
+    L = [f"📈 HISTÓRICO {LIGA.upper()} ({info['desde'].strftime('%d/%m')}–{info['hasta'].strftime('%d/%m')})",
          f"{info['grupos']} grupos analizados"]
     for tipo, ic in (("OFICIAL", "🟢"), ("POTENCIAL", "🟡")):
         rs = [r for r in rows if r["tipo"] == tipo]
@@ -579,7 +584,7 @@ def tg_file(path):
 
 
 def main():
-    tg_text(f"⏳ Empiezo el análisis histórico ({DAYS} días). Tardará unos minutos.")
+    tg_text(f"⏳ Empiezo el análisis histórico de {LIGA} ({DAYS} días). Tardará unos minutos.")
     rows, info = run()
     add_odds(rows)
     os.makedirs(OUT, exist_ok=True)
