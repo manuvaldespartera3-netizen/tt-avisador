@@ -1,0 +1,188 @@
+INFORME HISTÓRICO SETKA CUP
+Periodo: 2026-07-21 a 2026-10-18 · 1570 grupos analizados · 0 descartados por datos dudosos
+
+CÓMO SE LEE
+• % = acierto real. (Elo X%) = lo que se esperaría solo por nivel.
+  Si el real supera al Elo, la motivación aporta algo más.
+• cuota ≥ = cuota media mínima para no perder dinero.
+• segura ≥ = cuota mínima con margen (95%): cobrando eso o más,
+  es muy probable que sea rentable.
+• mitades = acierto antes / después del 2026-09-04.
+  estable ✅ = se repite · inestable ⚠️ = puede ser casualidad.
+• Menos de 30 picks = no fiable.
+
+============================================================
+🟢🟢 PICK OFICIAL
+============================================================
+▶ Todos — todos los picks de este tipo
+   196 picks · 101✅ · 52% (Elo 55%) · cuota ≥1.94 · segura ≥2.24
+   mitades 53% / 50% estable ✅
+   💶 🔴 cuota media 1.74 · beneficio -13.2 u · rentabilidad -15.5% (85 con cuota)
+▶ Sin aviso de puntos — quitando los que podían decidirse por puntos
+   170 picks · 86✅ · 51% (Elo 55%) · cuota ≥1.98 · segura ≥2.32
+   mitades 51% / 51% estable ✅
+   💶 🔴 cuota media 1.73 · beneficio -12.8 u · rentabilidad -17.6% (73 con cuota)
+▶ Pick favorito por Elo — el pick tiene más Elo que el rival
+   137 picks · 73✅ · 53% (Elo 60%) · cuota ≥1.88 · segura ≥2.22
+   mitades 52% / 54% estable ✅
+   💶 🔴 cuota media 1.70 · beneficio -4.9 u · rentabilidad -7.3% (67 con cuota)
+▶ Pick NO favorito por Elo — el pick tiene menos Elo que el rival
+   59 picks · 28✅ · 47% (Elo 44%) · cuota ≥2.11 · segura ≥2.84
+   mitades 55% / 39% inestable ⚠️
+   💶 🔴 cuota media 1.90 · beneficio -8.3 u · rentabilidad -46.1% (18 con cuota)
+▶ Elo pick +100 o más — el pick es claramente mejor jugador
+   37 picks · 21✅ · 57% (Elo 70%) · cuota ≥1.76 · segura ≥2.44
+   mitades 60% / 53% inestable ⚠️
+   💶 ⚪ cuota media 1.55 · beneficio -0.1 u · rentabilidad -0.4% (21 con cuota)
+▶ Elo pick -100 o menos — el pick es claramente peor jugador
+   4 picks · 1✅ · 25% (Elo 26%) · cuota ≥4.00 · segura ≥21.94
+   mitades 0% / 50% pocos casos, no fiable
+   💶 🔴 cuota media 2.36 · beneficio -3.0 u · rentabilidad -100.0% (3 con cuota)
+▶ H2H a favor — el pick ganó más enfrentamientos previos
+   94 picks · 52✅ · 55% (Elo 57%) · cuota ≥1.81 · segura ≥2.21
+   mitades 58% / 53% estable ✅
+   💶 🔴 cuota media 1.59 · beneficio -3.6 u · rentabilidad -8.1% (44 con cuota)
+▶ H2H en contra — el rival ganó más enfrentamientos previos
+   52 picks · 21✅ · 40% (Elo 52%) · cuota ≥2.48 · segura ≥3.55
+   mitades 39% / 42% estable ✅
+   💶 🔴 cuota media 2.06 · beneficio -7.1 u · rentabilidad -35.8% (20 con cuota)
+▶ Sin H2H / empatado — no hay historial o está igualado
+   50 picks · 28✅ · 56% (Elo 54%) · cuota ≥1.79 · segura ≥2.36
+   mitades 59% / 52% inestable ⚠️
+   💶 🔴 cuota media 1.76 · beneficio -2.4 u · rentabilidad -11.6% (21 con cuota)
+▶ Rival con 0 victorias — el rival no ha ganado nada en el grupo
+   196 picks · 101✅ · 52% (Elo 55%) · cuota ≥1.94 · segura ≥2.24
+   mitades 53% / 50% estable ✅
+   💶 🔴 cuota media 1.74 · beneficio -13.2 u · rentabilidad -15.5% (85 con cuota)
+▶ Rival con 1+ victorias — el rival ha ganado algún partido
+   sin casos
+▶ Rival ≤2 sets en el grupo — el rival llega muy flojo (casi sin sets)
+   150 picks · 77✅ · 51% (Elo 55%) · cuota ≥1.95 · segura ≥2.30
+   mitades 54% / 49% estable ✅
+   💶 🔴 cuota media 1.74 · beneficio -12.2 u · rentabilidad -18.4% (66 con cuota)
+▶ Pick anticipado — el pick se sabía un partido antes (tiempo de sobra)
+   45 picks · 19✅ · 42% (Elo 56%) · cuota ≥2.37 · segura ≥3.45
+   mitades 44% / 39% estable ✅
+   💶 🔴 cuota media 1.76 · beneficio -9.3 u · rentabilidad -42.4% (22 con cuota)
+▶ Pick de último momento — se decidió con el partido justo anterior
+   151 picks · 82✅ · 54% (Elo 55%) · cuota ≥1.84 · segura ≥2.16
+   mitades 56% / 52% estable ✅
+   💶 🔴 cuota media 1.74 · beneficio -3.8 u · rentabilidad -6.1% (63 con cuota)
+▶ Último partido del grupo — el pick es el 6.º partido
+   148 picks · 71✅ · 48% (Elo 55%) · cuota ≥2.08 · segura ≥2.50
+   mitades 47% / 49% estable ✅
+   💶 🔴 cuota media 1.74 · beneficio -14.3 u · rentabilidad -22.1% (65 con cuota)
+▶ Mañana (antes de 14:00)
+   85 picks · 43✅ · 51% (Elo 56%) · cuota ≥1.98 · segura ≥2.49
+   mitades 47% / 55% inestable ⚠️
+   💶 🔴 cuota media 1.80 · beneficio -2.8 u · rentabilidad -7.7% (36 con cuota)
+▶ Tarde (14:00-19:59)
+   73 picks · 35✅ · 48% (Elo 55%) · cuota ≥2.09 · segura ≥2.71
+   mitades 56% / 41% inestable ⚠️
+   💶 🔴 cuota media 1.72 · beneficio -12.9 u · rentabilidad -34.9% (37 con cuota)
+▶ Noche (20:00 o más)
+   38 picks · 23✅ · 61% (Elo 54%) · cuota ≥1.65 · segura ≥2.24
+   mitades 62% / 59% estable ✅
+   💶 🟢 cuota media 1.64 · beneficio +2.5 u · rentabilidad +20.9% (12 con cuota)
+▶ Mercado hándicap -1,5 sets — el pick gana 3-0 o 3-1 (el % Elo no aplica aquí)
+   196 picks · 79✅ · 40% (Elo 55%) · cuota ≥2.48 · segura ≥2.97
+   mitades 40% / 41% estable ✅
+
+  Mejores combinaciones (elegidas hasta 2026-09-13, comprobadas después):
+   · Pick favorito por Elo + Rival ≤2 sets en el grupo: 60% (63) → después 50% (38) ❌ no se mantiene
+   · Rival ≤2 sets en el grupo + Pick de último momento: 60% (58) → después 49% (47) ❌ no se mantiene
+   · Rival con 0 victorias + Pick de último momento: 57% (84) → después 51% (67) ❌ no se mantiene
+   · Rival con 0 victorias + Rival ≤2 sets en el grupo: 57% (90) → después 43% (60) ❌ no se mantiene
+   · Sin aviso de puntos + Pick de último momento: 58% (66) → después 49% (59) ❌ no se mantiene
+   · Sin aviso de puntos + Pick NO favorito por Elo: 63% (30) → después 33% (21) ❌ no se mantiene
+
+============================================================
+🟡 PICK POTENCIAL
+============================================================
+▶ Todos — todos los picks de este tipo
+   186 picks · 94✅ · 51% (Elo 46%) · cuota ≥1.98 · segura ≥2.30
+   mitades 48% / 53% estable ✅
+   💶 🟢 cuota media 2.16 · beneficio +18.9 u · rentabilidad +23.3% (81 con cuota)
+▶ Sin aviso de puntos — quitando los que podían decidirse por puntos
+   163 picks · 82✅ · 50% (Elo 46%) · cuota ≥1.99 · segura ≥2.34
+   mitades 48% / 53% estable ✅
+   💶 🟢 cuota media 2.12 · beneficio +15.1 u · rentabilidad +21.9% (69 con cuota)
+▶ Pick favorito por Elo — el pick tiene más Elo que el rival
+   61 picks · 33✅ · 54% (Elo 56%) · cuota ≥1.85 · segura ≥2.40
+   mitades 42% / 68% inestable ⚠️
+   💶 🟢 cuota media 1.85 · beneficio +3.7 u · rentabilidad +15.3% (24 con cuota)
+▶ Pick NO favorito por Elo — el pick tiene menos Elo que el rival
+   125 picks · 61✅ · 49% (Elo 41%) · cuota ≥2.05 · segura ≥2.49
+   mitades 51% / 47% estable ✅
+   💶 🟢 cuota media 2.29 · beneficio +15.2 u · rentabilidad +26.7% (57 con cuota)
+▶ Elo pick +100 o más — el pick es claramente mejor jugador
+   6 picks · 2✅ · 33% (Elo 69%) · cuota ≥3.00 · segura ≥10.33
+   mitades 33% / 33% pocos casos, no fiable
+   💶 🔴 cuota media 1.60 · beneficio -2.4 u · rentabilidad -60.8% (4 con cuota)
+▶ Elo pick -100 o menos — el pick es claramente peor jugador
+   26 picks · 7✅ · 27% (Elo 31%) · cuota ≥3.71 · segura ≥7.30
+   mitades 31% / 23% pocos casos, no fiable
+   💶 🟢 cuota media 3.25 · beneficio +1.7 u · rentabilidad +17.3% (10 con cuota)
+▶ H2H a favor — el pick ganó más enfrentamientos previos
+   65 picks · 39✅ · 60% (Elo 48%) · cuota ≥1.67 · segura ≥2.09
+   mitades 57% / 63% estable ✅
+   💶 🟢 cuota media 1.72 · beneficio +3.4 u · rentabilidad +11.7% (29 con cuota)
+▶ H2H en contra — el rival ganó más enfrentamientos previos
+   72 picks · 33✅ · 46% (Elo 43%) · cuota ≥2.18 · segura ≥2.87
+   mitades 44% / 47% estable ✅
+   💶 🟢 cuota media 2.60 · beneficio +13.7 u · rentabilidad +41.6% (33 con cuota)
+▶ Sin H2H / empatado — no hay historial o está igualado
+   49 picks · 22✅ · 45% (Elo 46%) · cuota ≥2.23 · segura ≥3.14
+   mitades 43% / 47% estable ✅
+   💶 🟢 cuota media 2.06 · beneficio +1.8 u · rentabilidad +9.3% (19 con cuota)
+▶ Rival con 0 victorias — el rival no ha ganado nada en el grupo
+   sin casos
+▶ Rival con 1+ victorias — el rival ha ganado algún partido
+   186 picks · 94✅ · 51% (Elo 46%) · cuota ≥1.98 · segura ≥2.30
+   mitades 48% / 53% estable ✅
+   💶 🟢 cuota media 2.16 · beneficio +18.9 u · rentabilidad +23.3% (81 con cuota)
+▶ Rival ≤2 sets en el grupo — el rival llega muy flojo (casi sin sets)
+   sin casos
+▶ Pick anticipado — el pick se sabía un partido antes (tiempo de sobra)
+   43 picks · 24✅ · 56% (Elo 44%) · cuota ≥1.79 · segura ≥2.43
+   mitades 47% / 62% inestable ⚠️
+   💶 🟢 cuota media 2.44 · beneficio +10.0 u · rentabilidad +45.5% (22 con cuota)
+▶ Pick de último momento — se decidió con el partido justo anterior
+   143 picks · 70✅ · 49% (Elo 46%) · cuota ≥2.04 · segura ≥2.45
+   mitades 48% / 50% estable ✅
+   💶 🟢 cuota media 2.05 · beneficio +8.9 u · rentabilidad +15.0% (59 con cuota)
+▶ Último partido del grupo — el pick es el 6.º partido
+   153 picks · 75✅ · 49% (Elo 46%) · cuota ≥2.04 · segura ≥2.43
+   mitades 47% / 51% estable ✅
+   💶 🟢 cuota media 2.12 · beneficio +11.9 u · rentabilidad +19.5% (61 con cuota)
+▶ Mañana (antes de 14:00)
+   61 picks · 31✅ · 51% (Elo 44%) · cuota ≥1.97 · segura ≥2.59
+   mitades 50% / 52% estable ✅
+   💶 🟢 cuota media 2.22 · beneficio +8.6 u · rentabilidad +29.7% (29 con cuota)
+▶ Tarde (14:00-19:59)
+   82 picks · 46✅ · 56% (Elo 46%) · cuota ≥1.78 · segura ≥2.21
+   mitades 53% / 60% estable ✅
+   💶 🟢 cuota media 2.18 · beneficio +14.0 u · rentabilidad +34.9% (40 con cuota)
+▶ Noche (20:00 o más)
+   43 picks · 17✅ · 40% (Elo 48%) · cuota ≥2.53 · segura ≥3.79
+   mitades 29% / 46% inestable ⚠️
+   💶 🔴 cuota media 1.90 · beneficio -3.7 u · rentabilidad -30.8% (12 con cuota)
+▶ Mercado hándicap -1,5 sets — el pick gana 3-0 o 3-1 (el % Elo no aplica aquí)
+   186 picks · 60✅ · 32% (Elo 46%) · cuota ≥3.10 · segura ≥3.85
+   mitades 28% / 37% inestable ⚠️
+
+  Mejores combinaciones (elegidas hasta 2026-09-13, comprobadas después):
+   · Pick NO favorito por Elo + Tarde (14:00-19:59): 62% (32) → después 50% (20) ❌ no se mantiene
+   · Rival con 1+ victorias + Tarde (14:00-19:59): 58% (52) → después 53% (30) ✅
+   · Pick de último momento + Tarde (14:00-19:59): 58% (43) → después 54% (24) ✅
+   · Sin aviso de puntos + H2H a favor: 59% (32) → después 58% (26) ✅
+   · Sin aviso de puntos + Tarde (14:00-19:59): 57% (46) → después 48% (25) ❌ no se mantiene
+   · H2H a favor + Rival con 1+ victorias: 59% (34) → después 61% (31) ✅
+
+VEREDICTO
+  OFICIAL: 196 picks, aciertas 52%. Solo por nivel (Elo) se esperaría 55% → efecto motivación -4 puntos.
+     Sigue SOLO si tu cuota media es ≥ 2.24 (seguro) o al menos ≥ 1.94 (punto de equilibrio). Por debajo de 1.94 pierdes dinero a la larga.
+     Con las cuotas reales de Sofascore (media 1.74) PIERDE dinero: -13.2 unidades en 85 picks (-15.5% por apuesta).
+  POTENCIAL: 186 picks, aciertas 51%. Solo por nivel (Elo) se esperaría 46% → efecto motivación +5 puntos.
+     Sigue SOLO si tu cuota media es ≥ 2.30 (seguro) o al menos ≥ 1.98 (punto de equilibrio). Por debajo de 1.98 pierdes dinero a la larga.
+     Con las cuotas reales de Sofascore (media 2.16) GANA dinero: +18.9 unidades en 81 picks (+23.3% por apuesta).
