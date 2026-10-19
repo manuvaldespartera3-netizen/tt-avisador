@@ -26,6 +26,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+import tt_engine
 import tt_feed
 from tt_feed import parse, _call, _events, URL_TOURNAMENT, TOURNAMENT_ID, TZ, WINDOW_H
 from tt_engine import Group, Match
@@ -35,6 +36,8 @@ WARMUP = int(os.getenv("BT_WARMUP", "45"))
 LIGAS = {"15005": "TT Cup", "19039": "Czech Liga Pro", "15004": "Setka Cup",
          "19041": "TT Elite Series"}
 LIGA = LIGAS.get(str(TOURNAMENT_ID), str(TOURNAMENT_ID))
+if str(TOURNAMENT_ID) == "19039":
+    tt_engine.TIEBREAK = "ligapro"      # reglas de desempate de Liga Pro
 # TT Cup en backtest/ (como siempre); las demas ligas en su propia carpeta
 OUT = os.getenv("BT_OUT", "backtest" if str(TOURNAMENT_ID) == "15005"
                 else f"backtest/{LIGA.lower().replace(' ', '_')}")

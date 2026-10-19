@@ -41,6 +41,15 @@ class Match:
         return FINALS
 
 
+import os
+# Reglas de desempate:
+#   "ttcup"   -> mini-liga entre empatados, luego sets y puntos entre ellos
+#   "ligapro" -> (Czech Liga Pro) sets ganados -> diferencia de sets ->
+#                diferencia de puntos -> puntos totales (en todo el grupo) ->
+#                enfrentamiento directo si quedan 2
+TIEBREAK = os.getenv("TT_TIEBREAK", "ttcup")
+
+
 def _rank(players, res):
     """res: dict frozenset({a,b}) -> (a, b, sa, sb, pa, pb). Devuelve lista de
     'tiers' (listas de jugadores) en orden; un tier con >1 = sin resolver."""
@@ -50,8 +59,43 @@ def _rank(players, res):
     tiers = []
     for w in sorted(set(wins.values()), reverse=True):
         grp = [p for p in players if wins[p] == w]
-        tiers.extend(_resolve(grp, res))
+        tiers.extend(_resolve_lp(grp, res) if TIEBREAK == "ligapro" else _resolve(grp, res))
     return tiers
+
+
+def _resolve_lp(grp, res):
+    """Desempate tipo Liga Pro con estadisticas de TODO el grupo."""
+    if len(grp) == 1:
+        return [grp]
+    st = {p: [0, 0, 0, 0] for p in grp}      # sets ganados, dif sets, dif puntos, puntos
+    pts_known = True
+    for (a, b, sa, sb, pa, pb) in res.values():
+        for p, my, ot, mp, op in ((a, sa, sb, pa, pb), (b, sb, sa, pb, pa)):
+            if p in st:
+                st[p][0] += my
+                st[p][1] += my - ot
+                if mp is None:
+                    pts_known = False
+                else:
+                    st[p][2] += mp - op
+                    st[p][3] += mp
+    keys = [0, 1] + ([2, 3] if pts_known else [])
+
+    def split(g, k):
+        if k >= len(keys):
+            if len(g) == 2:
+                r = res.get(frozenset(g))
+                if r:
+                    win = r[0] if r[2] > r[3] else r[1]
+                    return [[win], [g[1] if win == g[0] else g[0]]]
+            return [g]
+        vals = sorted({st[p][keys[k]] for p in g}, reverse=True)
+        out = []
+        for v in vals:
+            sub = [p for p in g if st[p][keys[k]] == v]
+            out.extend([sub] if len(sub) == 1 else split(sub, k + 1))
+        return out
+    return split(list(grp), 0)
 
 
 def _sub(res, grp):
