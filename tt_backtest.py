@@ -88,6 +88,10 @@ def _dec(v):
     """'4/9' -> 1.44 · '1.44' -> 1.44 · None si no se entiende."""
     if v in (None, ""):
         return None
+    if isinstance(v, dict):          # formato de tu API: {"decimal": 1.8, "fractional": "4/5"}
+        v = v.get("decimal") or v.get("fractional")
+        if v in (None, ""):
+            return None
     try:
         v = str(v)
         if "/" in v:
@@ -160,7 +164,8 @@ def fetch_odds(mid):
 
     def pair(c):
         fin = _dec(c.get("fractionalValue")) or _dec(c.get("decimalValue")) or _dec(c.get("value"))
-        ini = _dec(c.get("initialFractionalValue")) or _dec(c.get("initialDecimalValue")) or fin
+        ini = (_dec(c.get("initialFractionalValue")) or _dec(c.get("initialDecimalValue"))
+               or _dec(c.get("initialValue")) or fin)
         return ini, fin
     hi, hf = pair(ch["1"])
     ai, af = pair(ch["2"])
