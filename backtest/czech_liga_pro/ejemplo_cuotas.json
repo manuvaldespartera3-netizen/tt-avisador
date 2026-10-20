@@ -11,27 +11,27 @@
     {
      "name": "1",
      "initialValue": {
-      "fractional": "2/5",
-      "decimal": 1.4,
-      "american": "-250"
+      "fractional": "1/4",
+      "decimal": 1.25,
+      "american": "-400"
      },
      "value": {
-      "fractional": "2/5",
-      "decimal": 1.4,
-      "american": "-250"
+      "fractional": "1/4",
+      "decimal": 1.25,
+      "american": "-400"
      }
     },
     {
      "name": "2",
      "initialValue": {
-      "fractional": "7/4",
-      "decimal": 2.75,
-      "american": "+175"
+      "fractional": "11/4",
+      "decimal": 3.75,
+      "american": "+275"
      },
      "value": {
-      "fractional": "7/4",
-      "decimal": 2.75,
-      "american": "+175"
+      "fractional": "11/4",
+      "decimal": 3.75,
+      "american": "+275"
      }
     }
    ]
@@ -49,27 +49,27 @@
     {
      "name": "1",
      "initialValue": {
-      "fractional": "8/11",
-      "decimal": 1.73,
-      "american": "-138"
+      "fractional": "11/10",
+      "decimal": 2.1,
+      "american": "+110"
      },
      "value": {
-      "fractional": "8/11",
-      "decimal": 1.73,
-      "american": "-138"
+      "fractional": "11/10",
+      "decimal": 2.1,
+      "american": "+110"
      }
     },
     {
      "name": "2",
      "initialValue": {
-      "fractional": "1/1",
-      "decimal": 2,
-      "american": "+100"
+      "fractional": "4/6",
+      "decimal": 1.67,
+      "american": "-150"
      },
      "value": {
-      "fractional": "1/1",
-      "decimal": 2,
-      "american": "+100"
+      "fractional": "4/6",
+      "decimal": 1.67,
+      "american": "-150"
      }
     }
    ]
