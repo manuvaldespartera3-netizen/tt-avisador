@@ -30,11 +30,12 @@ import tt_engine
 import tt_feed
 from tt_feed import parse, _call, _events, URL_TOURNAMENT, TOURNAMENT_ID, TZ, WINDOW_H
 from tt_engine import Group, Match
+from tt_tipo_b import eval_b
 
 DAYS = int(os.getenv("BT_DAYS", "90"))
 WARMUP = int(os.getenv("BT_WARMUP", "45"))
 LIGAS = {"15005": "TT Cup", "19039": "Czech Liga Pro", "15004": "Setka Cup",
-         "19041": "TT Elite Series"}
+         "19041": "TT Elite Series", "9410": "Challenger Series"}
 LIGA = LIGAS.get(str(TOURNAMENT_ID), str(TOURNAMENT_ID))
 if str(TOURNAMENT_ID) == "19039":
     tt_engine.TIEBREAK = "ligapro"      # reglas de desempate de Liga Pro
@@ -293,6 +294,9 @@ def simulate(players, ms):
         m = g.matches[j]
         r = g._eval_match(m, {})
         if not r:
+            rb = eval_b(g, m)                 # OFICIAL B (solo para medir)
+            if rb:
+                out.append(dict(j=j, r=rb, antic=False, tipo="OFICIAL B"))
             continue
         # anticipado = el pick ya era seguro antes de acabar el partido anterior,
         # ganase quien ganase ese partido
@@ -305,7 +309,7 @@ def simulate(players, ms):
             if not r0 or r0["pick"] != r["pick"]:
                 antic = False
                 break
-        out.append(dict(j=j, r=r, antic=antic))
+        out.append(dict(j=j, r=r, antic=antic, tipo=None))
     return out
 
 
@@ -351,7 +355,7 @@ def run():
             dt = datetime.fromtimestamp(x["t"], TZ)
             rows.append(dict(
                 fecha=dt.strftime("%Y-%m-%d"), hora=dt.strftime("%H:%M"),
-                tipo="OFICIAL" if "eliminado" in r["reason"] else "POTENCIAL",
+                tipo=s.get("tipo") or ("OFICIAL" if "eliminado" in r["reason"] else "POTENCIAL"),
                 pick=pick, rival=rival, partido=j + 1, pick_local=1 if pick_home else 0,
                 gana=1 if sp > sr else 0, marcador=f"{sp}-{sr}",
                 gana_por_2=1 if sp == 3 and sr <= 1 else 0,
@@ -485,11 +489,12 @@ def report(rows, info):
     L.append(f"• mitades = acierto antes / después del {half}.")
     L.append("  estable ✅ = se repite · inestable ⚠️ = puede ser casualidad.")
     L.append(f"• Menos de {MIN_N} picks = no fiable.")
-    for tipo in ("OFICIAL", "POTENCIAL"):
+    for tipo in ("OFICIAL", "OFICIAL B", "POTENCIAL"):
         rs = [r for r in rows if r["tipo"] == tipo]
         L.append("")
         L.append("=" * 60)
-        L.append(f"{'🟢🟢 PICK OFICIAL' if tipo == 'OFICIAL' else '🟡 PICK POTENCIAL'}")
+        L.append({"OFICIAL": "🟢🟢 PICK OFICIAL", "OFICIAL B": "🔵 PICK OFICIAL B (rival eliminado, ganar no asegura pasar)",
+                  "POTENCIAL": "🟡 PICK POTENCIAL"}[tipo])
         L.append("=" * 60)
         for name, expl, f in FILTERS:
             L.append(fmt_row(name, [r for r in rs if f(r)], half, expl=expl))
@@ -510,7 +515,7 @@ def report(rows, info):
 
 def verdict(rows):
     out = []
-    for tipo in ("OFICIAL", "POTENCIAL"):
+    for tipo in ("OFICIAL", "OFICIAL B", "POTENCIAL"):
         rs = [r for r in rows if r["tipo"] == tipo]
         n, g, p, lo = stat(rs)
         if n < MIN_N:
@@ -534,7 +539,7 @@ def verdict(rows):
 def telegram_summary(rows, info):
     L = [f"📈 HISTÓRICO {LIGA.upper()} ({info['desde'].strftime('%d/%m')}–{info['hasta'].strftime('%d/%m')})",
          f"{info['grupos']} grupos analizados"]
-    for tipo, ic in (("OFICIAL", "🟢"), ("POTENCIAL", "🟡")):
+    for tipo, ic in (("OFICIAL", "🟢"), ("OFICIAL B", "🔵"), ("POTENCIAL", "🟡")):
         rs = [r for r in rows if r["tipo"] == tipo]
         n, g, p, lo = stat(rs)
         if not n:

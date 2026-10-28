@@ -23,6 +23,7 @@ import urllib.request
 
 import tt_feed
 from tt_feed import fetch, build_groups, h2h
+from tt_tipo_b import eval_b
 
 TG = os.getenv("TELEGRAM_TOKEN", "").strip()
 CHAT = os.getenv("MY_CHAT_ID", "").strip()
@@ -36,7 +37,7 @@ POLL_EVENT = int(os.getenv("POLL_EVENT", "8"))   # segundos entre lecturas del p
 TEST = os.getenv("TEST_MODE", "1") == "1"
 REPORT_EVERY = 15 * 60
 STATE_FILE = os.getenv("STATE_FILE", "state.json")
-VERSION = "14"   # al cambiarlo se reenvia el mensaje de arranque
+VERSION = "15"   # al cambiarlo se reenvia el mensaje de arranque
 PICKS_FILE = os.getenv("PICKS_FILE", "picks.csv")
 SUMMARY_HOUR = os.getenv("SUMMARY_AT", "23:45")   # hora del resumen diario
 FIELDS = ["fecha", "hora", "tipo", "pick", "rival", "h2h_pick", "h2h_rival",
@@ -241,7 +242,7 @@ def euro_line(label, rows):
 
 
 def startup_report():
-    lines = ["🟢 Avisador TT Cup activo (v14)" + (" (MODO PRUEBA)" if TEST else ""),
+    lines = ["🟢 Avisador TT Cup activo (v15)" + (" (MODO PRUEBA)" if TEST else ""),
              "Solo OFICIALES · ⭐ = alta calidad · cada pick trae su cuota mínima",
              "✍️ Responde a cada pick con tu cuota (ej. 1.45) · /resumen = resumen al momento",
              "✍️ /pick Apellido 1.88 = registrar a mano un pick que apostaste"]
@@ -408,6 +409,7 @@ def summary_text(today):
     lines.append(_line("  H2H en contra", contra))
     lines.append("")
     lines.append("Sin avisar (solo seguimiento):")
+    lines.append(_line("  🔵 OFICIAL B", [p for p in calla if p.get("tipo") == "OFICIAL B"]))
     lines.append(_line("  🟡 POTENCIAL", [p for p in calla if p.get("tipo") == "POTENCIAL"]))
     lines.append(_line("  🌙 oficial noche", [p for p in calla if p.get("calidad") == "noche"]))
     lines.append("")
@@ -597,6 +599,39 @@ def progress(e):
     return rank * 100000 + sets * 1000 + pts
 
 
+def track_b(g, results, sent):
+    """OFICIAL B, solo seguimiento (no se avisa): rival eliminado y pick
+    obligado a ganar, aunque ganar no le asegure pasar."""
+    try:
+        pend = g.pending()
+        if not pend:
+            return
+        m0 = pend[0]
+        early0 = m0.live == (0, 0) and m0.live_pts <= LIVE_PTS_MAX
+        if not (m0.live is None or early0):
+            return
+        if any(r["match"].mid == m0.mid and not r["conds"] for r in results):
+            return                              # ya es oficial o potencial
+        rb = eval_b(g, m0)
+        if not rb:
+            return
+        key = f"B|{m0.mid}|{rb['pick']}"
+        if key in sent:
+            return
+        sent.add(key)
+        state["sent"].append(key)
+        picks.append({"fecha": datetime.now(tt_feed.TZ).strftime("%Y-%m-%d"), "hora": m0.time,
+                      "tipo": "OFICIAL B", "pick": rb["pick"], "rival": rb["vs"],
+                      "h2h_pick": "", "h2h_rival": "", "aviso_puntos": "",
+                      "match_id": m0.mid, "resultado": "", "marcador": "",
+                      "momento": "vivo" if early0 else "antes", "calidad": "",
+                      "enviado": "no", "cuota": "", "apuesta": "", "msg_id": ""})
+        save_picks()
+        print("Seguimiento OFICIAL B:", rb["pick"], "vs", rb["vs"])
+    except Exception as ex:
+        print("WARN tipo B", ex)
+
+
 def tick():
     HOT["on"] = False
     HOT["ids"] = set()
@@ -646,6 +681,7 @@ def tick():
             continue
         checked |= {m.mid for m in g.matches}
         results = g.analyze()
+        track_b(g, results, sent)
         for r in results:
             cands.add(f"{r['match'].mid}|{r['pick']}")
             if not r["conds"]:
@@ -721,6 +757,8 @@ def tick():
     for pk in picks:
         if pk.get("resultado") or status.get(pk["match_id"]) != "notstarted":
             continue
+        if pk.get("tipo") == "OFICIAL B":
+            continue                    # seguimiento aparte: no se anula
         dud = pk["match_id"] not in checked and any(
             pk["match_id"] in {m.mid for m in g.matches} and getattr(g, "dudoso", False)
             for g in groups)
@@ -759,7 +797,8 @@ def main():
                 "429", "timed out", "URLError", "502", "503", "504", "500",
                 "IncompleteRead", "RemoteDisconnected", "ConnectionReset",
                 "ConnectionAborted", "JSONDecodeError", "BadStatusLine",
-                "ProtocolError", "SSLError", "EOF occurred"))
+                "ProtocolError", "SSLError", "EOF occurred", "HTTP Error 5"))
+            # (HTTP Error 5xx = servidor de la API caido un rato, p. ej. 521)
             if transient:
                 if state["fails"] == 10:
                     send(f"⚠️ El avisador lleva ~10 min sin poder leer Zyla: {err[:200]}")

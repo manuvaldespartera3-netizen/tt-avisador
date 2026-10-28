@@ -876,7 +876,8 @@ def main():
                 "429", "timed out", "URLError", "502", "503", "504", "500",
                 "IncompleteRead", "RemoteDisconnected", "ConnectionReset",
                 "ConnectionAborted", "JSONDecodeError", "BadStatusLine",
-                "ProtocolError", "SSLError", "EOF occurred"))
+                "ProtocolError", "SSLError", "EOF occurred", "HTTP Error 5"))
+            # (HTTP Error 5xx = servidor de la API caido un rato, p. ej. 521)
             if transient:
                 if state["fails"] == 10:
                     send(f"⚠️ El avisador lleva ~10 min sin poder leer Zyla: {err[:200]}")
