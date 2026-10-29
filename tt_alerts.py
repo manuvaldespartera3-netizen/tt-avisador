@@ -119,10 +119,15 @@ def manual_pick(text, parsed, reply_to):
     Busca el partido de hoy de ese jugador (el que no ha terminado, o el
     ultimo que ha terminado) y el bot apunta solo si gana o pierde."""
     words = text.split()[1:]
+    hora = next((w for w in words if len(w) in (4, 5) and ":" in w
+                 and w.replace(":", "").isdigit()), None)
+    words = [w for w in words if w != hora]
+    if hora and len(hora) == 4:
+        hora = "0" + hora
     nums = [w for w in words if _num(w) is not None]
     name = " ".join(w for w in words if _num(w) is None).strip().lower()
     if not name or not nums or not (1.01 <= _num(nums[0]) <= 50):
-        send("❓ Escríbelo así: /pick Apellido 1.88   (o /pick Apellido 1.88 120)", reply_to)
+        send("❓ Escríbelo así: /pick Apellido 1.88   (o /pick Apellido 1.88 120 18:15)", reply_to)
         return False
     cuota = _num(nums[0])
     apuesta = _num(nums[1]) if len(nums) > 1 else APUESTA_DEFECTO
@@ -130,6 +135,12 @@ def manual_pick(text, parsed, reply_to):
     if not cands:
         send(f"❓ No encuentro ningún partido de hoy de '{name}'. Revisa el apellido.", reply_to)
         return False
+    if hora:
+        cands = [p for p in cands
+                 if datetime.fromtimestamp(p["t"], tt_feed.TZ).strftime("%H:%M") == hora]
+        if not cands:
+            send(f"❓ No encuentro el partido de '{name}' a las {hora}. Revisa la hora.", reply_to)
+            return False
     vivos = [p for p in cands if not p["final"]]
     if vivos:
         m = min(vivos, key=lambda p: p["t"])           # el proximo o el que se juega
@@ -652,9 +663,19 @@ def tick():
         # lo leido partido a partido es mas reciente que la lista del torneo
         by = {str(e.get("id")): e for e in events}
         for mid, ev in FRESH.items():
+            base = by.get(mid)
             # solo se usa si va IGUAL o MAS ADELANTADO que la lista (nunca un dato viejo)
-            if progress(ev) >= progress(by.get(mid)):
-                by[mid] = ev
+            if not base or progress(ev) < progress(base):
+                continue
+            if ((ev.get("homeTeam") or {}).get("name") != (base.get("homeTeam") or {}).get("name")):
+                continue                     # datos de otro formato: no mezclar
+            # de la lectura rapida solo se toman marcador y estado; jugadores y hora
+            # siguen siendo los de la lista (si faltaran, el grupo no se formaria)
+            mix = dict(base)
+            for k in ("status", "homeScore", "awayScore", "winnerCode"):
+                if ev.get(k) is not None:
+                    mix[k] = ev[k]
+            by[mid] = mix
         events = list(by.values())
     groups, parsed = build_groups(events)
 
@@ -748,13 +769,13 @@ def tick():
                     # posibles revisados uno a uno (nunca un "gane quien gane" a medias).
                     # Con 2 sets de alguno ya va el SET DECISIVO, que es aun mas exacto.
                     alerted[f"{m.mid}|{r['pick']}"] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                        "pick": r["pick"], "hora": m.time}
+                        "pick": r["pick"], "hora": m.time, "ts": time.time()}
                     once(f"H|{m.mid}|{r['pick']}|{pm.mid}",
                          lambda r=r, pm=pm, g=g: full_heads_up_text(r, pm, g))
                 if pm.live and max(pm.live) == 2:
                     # set que puede cerrar el partido: respuesta exacta por resultado
                     alerted[f"{m.mid}|{r['pick']}"] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                        "pick": r["pick"], "hora": m.time}
+                        "pick": r["pick"], "hora": m.time, "ts": time.time()}
                     once(f"F|{m.mid}|{r['pick']}|{pm.mid}|{pm.live[0]}-{pm.live[1]}",
                          lambda r=r, pm=pm, g=g: closing_set_text(r, pm, g))
 
@@ -768,6 +789,11 @@ def tick():
             continue                         # todavía puede salir
         pmx = pstat.get(al["pm"])
         mid_pick = key.split("|")[0]
+        if mid_pick not in checked and time.time() - al.get("ts", 0) < 1200:
+            # el grupo no se ha podido leer bien en esta vuelta (dato a medias de
+            # la API): no se da por perdido, se espera a la siguiente lectura
+            print("Grupo del aviso sin datos fiables ahora, se espera:", key)
+            continue
         if pmx and pstat.get(mid_pick, {}).get("status") == "notstarted":
             sc = f"{pmx['score']}" if pmx.get("score") else ""
             once(f"X|{key}", lambda al=al, sc=sc:
