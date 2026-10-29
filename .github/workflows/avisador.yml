@@ -17,7 +17,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
+      # siempre la version MAS RECIENTE de main (no la del momento en que se
+      # pidio la ejecucion): asi nunca se trabaja con un picks.csv atrasado
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
@@ -53,6 +57,11 @@ jobs:
             git config user.email "tt-avisador@users.noreply.github.com"
             git add picks.csv
             git commit -m "Historial de picks"
-            git pull --rebase || true
+            # si alguien ha subido algo mientras tanto, se junta; en caso de choque
+            # en picks.csv manda SIEMPRE el de esta ejecucion (el mas nuevo)
+            if ! git pull --rebase; then
+              git rebase --abort || true
+              git pull --no-rebase --no-edit -X ours || true
+            fi
             git push || true
           fi
