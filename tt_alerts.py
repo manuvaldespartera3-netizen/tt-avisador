@@ -276,7 +276,7 @@ def h2h_for(m, pick):
 #   POTENCIAL: 43%, peor que el nivel de los jugadores              -> no se avisa
 # Los no avisados se siguen guardando en picks.csv para medirlos.
 CUOTA_ESTRELLA = os.getenv("CUOTA_ESTRELLA", "1.30")
-CUOTA_NORMAL = os.getenv("CUOTA_NORMAL", "1.55")
+CUOTA_NORMAL = os.getenv("CUOTA_NORMAL", "1.45")
 AVISAR_POTENCIAL = os.getenv("AVISAR_POTENCIAL", "0") == "1"
 
 

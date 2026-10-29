@@ -365,7 +365,9 @@ def run():
                 partidos_previos_pick=npk, partidos_previos_rival=nrv,
                 h2h_pick=hp, h2h_rival=hr,
                 victorias_pick_grupo=wins[pick], victorias_rival_grupo=wins[rival],
-                sets_rival_grupo=sets[rival], match_id=x["id"]))
+                sets_rival_grupo=sets[rival], match_id=x["id"],
+                dif_puntos=(((x["points"][0] - x["points"][1]) * (1 if pick_home else -1))
+                            if x.get("points") else "")))
     rows.sort(key=lambda z: (z["fecha"], z["hora"]))
     return rows, dict(partidos=len(parsed), grupos=n_groups, dudosos=dudosos,
                       desde=(end - timedelta(days=DAYS - 1)), hasta=end)
@@ -508,9 +510,69 @@ def report(rows, info):
                 ok = "✅" if pte >= ptr - 0.05 else "❌ no se mantiene"
                 L.append(f"   · {name}: {ptr*100:.0f}% ({ntr}) → después {pte*100:.0f}% ({nte}) {ok}")
     L.append("")
+    L.extend(handicap_report(rows))
+    L.append("")
     L.append("VEREDICTO")
     L.extend(verdict(rows))
     return "\n".join(L)
+
+
+# ------------------------------------------------------ handicap de puntos
+LINEAS = (1.5, 2.5, 3.5, 4.5, 5.5, 6.5)
+
+
+def _hc_rows(rows):
+    return [r for r in rows if r.get("dif_puntos") not in ("", None)]
+
+
+def hc_line(label, rows, ln):
+    """% de picks que cubren -ln puntos y cuota minima para que renten."""
+    rs = _hc_rows(rows)
+    n = len(rs)
+    if n < 10:
+        return f"   {label} -{ln}: pocos casos ({n})"
+    g = sum(1 for r in rs if r["dif_puntos"] > ln)
+    p, lo = g / n, wilson_low(g, n)
+    eq = f"{1 / p:.2f}" if p else "—"
+    seg = f"{1 / lo:.2f}" if lo else "—"
+    return f"   -{ln} puntos: {p * 100:.0f}% ({g}/{n}) · cuota ≥{eq} · segura ≥{seg}"
+
+
+def hc_compare(rows, cuota_hc=1.66, ln=4.5, umbral=1.40):
+    """Picks con cuota de ganador < umbral: ¿mejor ganador o handicap -ln a cuota_hc?"""
+    rs = [r for r in _hc_rows(rows) if r.get("cuota_final") and float(r["cuota_final"]) < umbral]
+    u = f"{umbral:.2f}".replace(".", ",")
+    if len(rs) < 10:
+        return [f"   Picks con cuota < {u}: pocos casos ({len(rs)}) para comparar"]
+    n = len(rs)
+    gw = sum(r["gana"] for r in rs)
+    media = sum(float(r["cuota_final"]) for r in rs) / n
+    ben_w = sum((float(r["cuota_final"]) - 1) if r["gana"] else -1 for r in rs)
+    gh = sum(1 for r in rs if r["dif_puntos"] > ln)
+    ben_h = gh * (cuota_hc - 1) - (n - gh)
+    return [f"   Picks con cuota de ganador < {u}: {n}",
+            f"   · Apostando a ganador (cuota media {media:.2f}): {gw}/{n} = {gw / n * 100:.0f}% → "
+            f"{ben_w:+.1f} u ({ben_w / n * 100:+.1f}%)",
+            f"   · Apostando -{ln} puntos a {cuota_hc:.2f}: {gh}/{n} = {gh / n * 100:.0f}% → "
+            f"{ben_h:+.1f} u ({ben_h / n * 100:+.1f}%)"]
+
+
+def handicap_report(rows):
+    L = ["=" * 60, "🎯 HÁNDICAP DE PUNTOS (solo OFICIAL)", "=" * 60,
+         "• -4,5 = el pick tiene que sacar 5 puntos o más de diferencia",
+         "  sumando todos los sets. Si pierde el partido, casi nunca cubre.",
+         "• cuota ≥ = la que necesitas como mínimo en ese hándicap."]
+    of = [r for r in rows if r["tipo"] == "OFICIAL"]
+    star = [r for r in of if not r["aviso_puntos"] and r["sets_rival_grupo"] <= 2]
+    norm = [r for r in of if r not in star and "06:00" <= r["hora"] < "20:00"]
+    for label, rs in (("Todos los OFICIAL", of), ("⭐ estrella", star), ("Normal de día", norm)):
+        L.append(f"▶ {label} ({len(_hc_rows(rs))} con puntos)")
+        for ln in LINEAS:
+            L.append(hc_line(label, rs, ln))
+    L.append("▶ ¿Compensa cambiar a -4,5 puntos cuando la cuota es baja?")
+    L.extend(hc_compare(of))
+    L.extend(hc_compare(of, umbral=1.50))
+    return L
 
 
 def verdict(rows):
@@ -560,6 +622,11 @@ def telegram_summary(rows, info):
             if sub and m2:
                 L.append(f"   {cal}: {len(sub)} · {stat(sub)[2]*100:.0f}% · cuota media {m2[1]:.2f} "
                          f"→ {m2[2]:+.1f} u ({m2[3]*100:+.1f}%)")
+    of = _hc_rows([r for r in rows if r["tipo"] == "OFICIAL"])
+    if len(of) >= 30:
+        g = sum(1 for r in of if r["dif_puntos"] > 4.5)
+        L.append(f"🎯 OFICIAL -4,5 puntos: {g / len(of) * 100:.0f}% · cuota mínima {len(of) / max(g, 1):.2f}")
+        L.extend(hc_compare([r for r in rows if r["tipo"] == "OFICIAL"]))
     L.append("Informe completo y lista de picks en los archivos 👇")
     return "\n".join(L)
 
