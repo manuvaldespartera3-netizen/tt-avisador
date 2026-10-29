@@ -127,13 +127,21 @@ def manual_pick(text, parsed, reply_to):
     nums = [w for w in words if _num(w) is not None]
     name = " ".join(w for w in words if _num(w) is None).strip().lower()
     if not name or not nums or not (1.01 <= _num(nums[0]) <= 50):
-        send("❓ Escríbelo así: /pick Apellido 1.88   (o /pick Apellido 1.88 120 18:15)", reply_to)
+        send("❓ Escríbelo así: /pick Apellido Rival 1.88 120   (o /pick Apellido 1.88)", reply_to)
         return False
     cuota = _num(nums[0])
     apuesta = _num(nums[1]) if len(nums) > 1 else APUESTA_DEFECTO
-    cands = [p for p in parsed if name in p["a"].lower() or name in p["b"].lower()]
+    # '/pick Pesout Motacek 1.97' -> la 2.a palabra es el rival (lo deja claro del todo)
+    nw = name.split()
+    name, rv = nw[0], (nw[1] if len(nw) > 1 else "")
+
+    def es(p):
+        a, b = p["a"].lower(), p["b"].lower()
+        return (name in a and rv in b) or (name in b and rv in a)
+    cands = [p for p in parsed if es(p)]
     if not cands:
-        send(f"❓ No encuentro ningún partido de hoy de '{name}'. Revisa el apellido.", reply_to)
+        txt = f"'{name}'" + (f" contra '{rv}'" if rv else "")
+        send(f"❓ No encuentro ningún partido de hoy de {txt}. Revisa los apellidos.", reply_to)
         return False
     if hora:
         # Sofascore a veces cambia la hora al empezar el partido (18:35 -> 18:41):
@@ -152,7 +160,7 @@ def manual_pick(text, parsed, reply_to):
         m = min(vivos, key=lambda p: p["t"])           # el proximo o el que se juega
     else:
         m = max(cands, key=lambda p: p["t"])           # el ultimo terminado
-    pick = m["a"] if name in m["a"].lower() else m["b"]
+    pick = m["a"] if (name in m["a"].lower() and rv in m["b"].lower()) else m["b"]
     rival = m["b"] if pick == m["a"] else m["a"]
     if any(p.get("match_id") == m["id"] and p.get("pick") == pick for p in picks):
         # ya estaba registrado (por ejemplo, el bot lo mando): solo se pone la cuota
@@ -169,6 +177,25 @@ def manual_pick(text, parsed, reply_to):
     send(f"✅ Registrado a mano: {pick} vs {rival} · "
          f"{datetime.fromtimestamp(m['t'], tt_feed.TZ).strftime('%H:%M')} @ {cuota:.2f} · "
          f"{apuesta:.0f} €\nEl resultado se apuntará solo.", reply_to)
+    return True
+
+
+def delete_manual(text, reply_to):
+    """'/borrar Apellido [Rival]' -> quita el ultimo pick puesto a mano de ese
+    jugador (si se pone el rival, solo el de ese partido)."""
+    nw = text.split()[1:]
+    name = nw[0].lower() if nw else ""
+    rv = nw[1].lower() if len(nw) > 1 else ""
+    hits = [p for p in picks if p.get("calidad") == "manual" and name
+            and name in p["pick"].lower() and rv in p["rival"].lower()]
+    if not hits:
+        txt = f"'{name}'" + (f" contra '{rv}'" if rv else "")
+        send(f"❓ No hay ningún pick puesto a mano de {txt}.", reply_to)
+        return False
+    pk = hits[-1]
+    picks.remove(pk)
+    send(f"🗑 Borrado: {pk['pick']} vs {pk['rival']} · {pk['fecha'][8:10]}/{pk['fecha'][5:7]} "
+         f"{pk['hora']} @ {pk.get('cuota', '')}", reply_to)
     return True
 
 
@@ -202,6 +229,10 @@ def read_replies(parsed=()):
             continue
         if text.startswith("/pick"):
             if manual_pick(text, parsed, msg.get("message_id")):
+                changed = True
+            continue
+        if text.startswith("/borrar"):
+            if delete_manual(text, msg.get("message_id")):
                 changed = True
             continue
         target = None
@@ -262,7 +293,8 @@ def startup_report():
     lines = ["🟢 Avisador TT Cup activo (v15)" + (" (MODO PRUEBA)" if TEST else ""),
              "Solo OFICIALES · ⭐ = alta calidad · cada pick trae su cuota mínima",
              "✍️ Responde a cada pick con tu cuota (ej. 1.45) · /resumen = resumen al momento",
-             "✍️ /pick Apellido 1.88 = registrar a mano un pick que apostaste"]
+             "✍️ /pick Apellido Rival 1.88 = registrar a mano un pick que apostaste",
+             "🗑 /borrar Apellido Rival = quitar un pick puesto a mano"]
     try:
         events, live = fetch()
         groups, parsed = build_groups(events)
