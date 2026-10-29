@@ -322,6 +322,18 @@ def confirm_text(r, g, hh, early=False):
     return txt
 
 
+def late_text(r, cal):
+    """Confirmacion de un pick avisado cuyo partido ya ha empezado."""
+    m = r["match"]
+    sa, sb = m.live or (0, 0)
+    star = "⭐ " if cal == "estrella" else ""
+    cuota = CUOTA_ESTRELLA if cal == "estrella" else CUOTA_NORMAL
+    return (f"✅ SE CUMPLIÓ → {star}PICK OFICIAL {r['pick'].upper()} vs {r['vs']} · {m.time}\n"
+            f"🔴 El partido ya ha empezado ({m.a} {sa}-{sb} {m.b} en sets).\n"
+            f"Si apostaste con el 🔔, está bien hecho. Si no, solo en vivo y con cuota ≥ {cuota}.\n"
+            f"✍️ Responde con tu cuota (ej. 1.45) o 'no'")
+
+
 def table_line(g):
     """Puntos de la tabla tal como los calcula el bot (victoria 2, derrota 1)."""
     pts = {p: 0 for p in g.players}
@@ -695,6 +707,17 @@ def tick():
             # marcado como YA EMPEZADO, por si aun se puede apostar en vivo.
             early = m.live == (0, 0) and m.live_pts <= LIVE_PTS_MAX
             if m.live is not None and not early:
+                # El partido del pick ya va avanzado. Si antes se mando el ATENTO o
+                # el SET DECISIVO de este pick (puede que ya hayas apostado), se
+                # confirma igualmente y se registra, para que nunca quede en el aire.
+                akey = f"{m.mid}|{r['pick']}"
+                key = f"C|{akey}"
+                if not r["conds"] and akey in alerted and key not in sent:
+                    cal = quality(r, g) if kind(r) == "OFICIAL" else ""
+                    sent.add(key)
+                    state["sent"].append(key)
+                    mid_tg = send(late_text(r, cal))
+                    register_pick(r, None, True, cal, True, mid_tg)
                 continue
             if not r["conds"]:
                 # pick seguro -> confirmacion (o solo registro si no se avisa)
@@ -719,6 +742,7 @@ def tick():
                 if pm.live is not None:
                     HOT["on"] = True      # partido decisivo en juego: mirar cada 15 s
                     HOT["ids"].add(pm.mid)
+                    HOT["last"] = time.time()
                 if in_late_stage(pm) and max(pm.live) < 2:
                     # Un solo aviso por partido decisivo, con TODOS los resultados
                     # posibles revisados uno a uno (nunca un "gane quien gane" a medias).
@@ -802,7 +826,9 @@ def main():
             if transient:
                 if state["fails"] == 10:
                     send(f"⚠️ El avisador lleva ~10 min sin poder leer Zyla: {err[:200]}")
-                time.sleep(60)          # espera extra antes de reintentar
+                # con un partido decisivo en juego no se puede esperar 1 minuto:
+                # se reintenta enseguida para no llegar tarde al pick
+                time.sleep(10 if time.time() - HOT.get("last", 0) < 600 else 60)
             elif err != state["last_error"]:
                 send(f"⚠️ Error avisador: {err[:300]}")
                 state["last_error"] = err
