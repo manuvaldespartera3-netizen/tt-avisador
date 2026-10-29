@@ -136,11 +136,17 @@ def manual_pick(text, parsed, reply_to):
         send(f"❓ No encuentro ningún partido de hoy de '{name}'. Revisa el apellido.", reply_to)
         return False
     if hora:
-        cands = [p for p in cands
-                 if datetime.fromtimestamp(p["t"], tt_feed.TZ).strftime("%H:%M") == hora]
+        # Sofascore a veces cambia la hora al empezar el partido (18:35 -> 18:41):
+        # se coge el partido de ese jugador mas cercano a esa hora (max. 30 min)
+        hh, mm = int(hora[:2]), int(hora[3:])
+        def gap(p):
+            d = datetime.fromtimestamp(p["t"], tt_feed.TZ)
+            return abs((d.hour * 60 + d.minute) - (hh * 60 + mm))
+        cands = [p for p in cands if gap(p) <= 30]
         if not cands:
-            send(f"❓ No encuentro el partido de '{name}' a las {hora}. Revisa la hora.", reply_to)
+            send(f"❓ No encuentro el partido de '{name}' cerca de las {hora}. Revisa la hora.", reply_to)
             return False
+        cands = [min(cands, key=gap)]
     vivos = [p for p in cands if not p["final"]]
     if vivos:
         m = min(vivos, key=lambda p: p["t"])           # el proximo o el que se juega
