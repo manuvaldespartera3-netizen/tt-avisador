@@ -255,6 +255,41 @@ CÓMO SE LEE
    · H2H a favor + Pick de último momento: 61% (36) → después 53% (34) ❌ no se mantiene
    · Sin aviso de puntos + Pick NO favorito por Elo: 55% (76) → después 38% (50) ❌ no se mantiene
 
+============================================================
+🎯 HÁNDICAP DE PUNTOS (solo OFICIAL)
+============================================================
+• -4,5 = el pick tiene que sacar 5 puntos o más de diferencia
+  sumando todos los sets. Si pierde el partido, casi nunca cubre.
+• cuota ≥ = la que necesitas como mínimo en ese hándicap.
+▶ Todos los OFICIAL (444 con puntos)
+   -1.5 puntos: 72% (320/444) · cuota ≥1.39 · segura ≥1.48
+   -2.5 puntos: 70% (309/444) · cuota ≥1.44 · segura ≥1.53
+   -3.5 puntos: 66% (292/444) · cuota ≥1.52 · segura ≥1.63
+   -4.5 puntos: 61% (271/444) · cuota ≥1.64 · segura ≥1.77
+   -5.5 puntos: 57% (255/444) · cuota ≥1.74 · segura ≥1.89
+   -6.5 puntos: 55% (242/444) · cuota ≥1.83 · segura ≥2.01
+▶ ⭐ estrella (289 con puntos)
+   -1.5 puntos: 74% (214/289) · cuota ≥1.35 · segura ≥1.46
+   -2.5 puntos: 72% (208/289) · cuota ≥1.39 · segura ≥1.50
+   -3.5 puntos: 68% (196/289) · cuota ≥1.47 · segura ≥1.61
+   -4.5 puntos: 64% (184/289) · cuota ≥1.57 · segura ≥1.72
+   -5.5 puntos: 60% (174/289) · cuota ≥1.66 · segura ≥1.84
+   -6.5 puntos: 57% (165/289) · cuota ≥1.75 · segura ≥1.95
+▶ Normal de día (111 con puntos)
+   -1.5 puntos: 74% (82/111) · cuota ≥1.35 · segura ≥1.54
+   -2.5 puntos: 72% (80/111) · cuota ≥1.39 · segura ≥1.58
+   -3.5 puntos: 69% (77/111) · cuota ≥1.44 · segura ≥1.66
+   -4.5 puntos: 63% (70/111) · cuota ≥1.59 · segura ≥1.86
+   -5.5 puntos: 59% (65/111) · cuota ≥1.71 · segura ≥2.03
+   -6.5 puntos: 55% (61/111) · cuota ≥1.82 · segura ≥2.19
+▶ ¿Compensa cambiar a -4,5 puntos cuando la cuota es baja?
+   Picks con cuota de ganador < 1,40: 11
+   · Apostando a ganador (cuota media 1.32): 11/11 = 100% → +3.5 u (+32.2%)
+   · Apostando -4.5 puntos a 1.66: 9/11 = 82% → +3.9 u (+35.8%)
+   Picks con cuota de ganador < 1,50: 27
+   · Apostando a ganador (cuota media 1.38): 24/27 = 89% → +6.1 u (+22.4%)
+   · Apostando -4.5 puntos a 1.66: 21/27 = 78% → +7.9 u (+29.1%)
+
 VEREDICTO
   OFICIAL: 444 picks, aciertas 79%. Solo por nivel (Elo) se esperaría 55% → efecto motivación +24 puntos.
      Sigue SOLO si tu cuota media es ≥ 1.34 (seguro) o al menos ≥ 1.27 (punto de equilibrio). Por debajo de 1.27 pierdes dinero a la larga.
