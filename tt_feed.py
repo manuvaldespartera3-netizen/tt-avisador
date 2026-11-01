@@ -166,7 +166,7 @@ def parse(e):
     sb = _int(as_.get("current", as_.get("display")))
     pa = sum(_int(hs.get(f"period{i}")) for i in range(1, 8))
     pb = sum(_int(as_.get(f"period{i}")) for i in range(1, 8))
-    final = live = points = None
+    final = live = points = done_pts = None
     live_pts = 0
     dudoso = False
     if st == "finished" and max(sa, sb) == 3:
@@ -195,6 +195,9 @@ def parse(e):
         live = (sa, sb)
         cur = sa + sb + 1
         live_pts = _int(hs.get(f"period{cur}")) + _int(as_.get(f"period{cur}"))
+        # puntos de los sets YA terminados (para calcular desempates por puntos)
+        done_pts = (sum(_int(hs.get(f"period{i}")) for i in range(1, cur)),
+                    sum(_int(as_.get(f"period{i}")) for i in range(1, cur)))
     elif st != "notstarted":
         return None      # cancelado, aplazado, etc.
     t = _int(e.get("startTimestamp") or e.get("timestamp"))
@@ -202,7 +205,8 @@ def parse(e):
                 a=(e.get("homeTeam") or {}).get("name", "?"),
                 b=(e.get("awayTeam") or {}).get("name", "?"),
                 t=t, final=final, live=live, points=points,
-                score=f"{sa}-{sb}", status=st, live_pts=live_pts, dudoso=dudoso)
+                score=f"{sa}-{sb}", status=st, live_pts=live_pts, dudoso=dudoso,
+                done_pts=done_pts)
 
 
 def build_groups(events):
@@ -247,6 +251,8 @@ def build_groups(events):
                          final=x["final"], live=x["live"], points=x["points"], mid=x["id"],
                          live_pts=x.get("live_pts", 0))
                    for i, x in enumerate(ms)]
+        for mm, x in zip(matches, ms):
+            mm.done_pts = x.get("done_pts")      # puntos de sets terminados (en juego)
         grp = Group(list(four), matches)
         grp.dudoso = any(x.get("dudoso") for x in ms)
         groups.append(grp)

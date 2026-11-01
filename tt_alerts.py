@@ -23,6 +23,7 @@ import urllib.request
 
 import tt_feed
 from tt_feed import fetch, build_groups, h2h
+from tt_engine import Group, Match
 from tt_tipo_b import eval_b
 
 TG = os.getenv("TELEGRAM_TOKEN", "").strip()
@@ -122,6 +123,25 @@ def manual_pick(text, parsed, reply_to):
     hora = next((w for w in words if len(w) in (4, 5) and ":" in w
                  and w.replace(":", "").isdigit()), None)
     words = [w for w in words if w != hora]
+    # fecha opcional '29/10' -> partido de otro dia (para apuntar picks atrasados)
+    fecha = next((w for w in words if "/" in w and w.replace("/", "").isdigit()
+                  and len(w.split("/")) == 2), None)
+    if fecha:
+        words = [w for w in words if w != fecha]
+        try:
+            dd, mo = (int(x) for x in fecha.split("/"))
+            hoy = datetime.now(tt_feed.TZ)
+            d = hoy.replace(month=mo, day=dd)
+            if d > hoy:
+                d = d.replace(year=hoy.year - 1)
+            evs = tt_feed._events(tt_feed._call(tt_feed.URL_TOURNAMENT,
+                                                unique_tournament_id=tt_feed.TOURNAMENT_ID,
+                                                date=d.strftime("%Y-%m-%d")))
+            parsed = [p for p in (tt_feed.parse(e) for e in evs) if p]
+        except Exception as ex:
+            send(f"❓ No he podido leer los partidos del {fecha} ({str(ex)[:80]}). Prueba en un rato.",
+                 reply_to)
+            return False
     if hora and len(hora) == 4:
         hora = "0" + hora
     nums = [w for w in words if _num(w) is not None]
@@ -141,7 +161,8 @@ def manual_pick(text, parsed, reply_to):
     cands = [p for p in parsed if es(p)]
     if not cands:
         txt = f"'{name}'" + (f" contra '{rv}'" if rv else "")
-        send(f"❓ No encuentro ningún partido de hoy de {txt}. Revisa los apellidos.", reply_to)
+        cuando = f"del {fecha}" if fecha else "de hoy"
+        send(f"❓ No encuentro ningún partido {cuando} de {txt}. Revisa los apellidos.", reply_to)
         return False
     if hora:
         # Sofascore a veces cambia la hora al empezar el partido (18:35 -> 18:41):
@@ -167,16 +188,26 @@ def manual_pick(text, parsed, reply_to):
         pk = next(p for p in picks if p.get("match_id") == m["id"] and p.get("pick") == pick)
         pk["cuota"], pk["apuesta"], pk["enviado"] = f"{cuota:.2f}", f"{apuesta:.0f}", "si"
     else:
-        picks.append({"fecha": datetime.now(tt_feed.TZ).strftime("%Y-%m-%d"),
+        picks.append({"fecha": datetime.fromtimestamp(m["t"], tt_feed.TZ).strftime("%Y-%m-%d"),
                       "hora": datetime.fromtimestamp(m["t"], tt_feed.TZ).strftime("%H:%M"),
                       "tipo": "OFICIAL", "pick": pick, "rival": rival,
                       "h2h_pick": "", "h2h_rival": "", "aviso_puntos": "",
                       "match_id": m["id"], "resultado": "", "marcador": "",
                       "momento": "manual", "calidad": "manual", "enviado": "si",
                       "cuota": f"{cuota:.2f}", "apuesta": f"{apuesta:.0f}", "msg_id": ""})
+    if fecha and m["final"]:
+        # partido de otro dia que ya termino: el resultado se apunta ahora mismo
+        pk = next(p for p in picks if p.get("match_id") == m["id"] and p.get("pick") == pick)
+        sa, sb = m["final"]
+        home = pick == m["a"]
+        pk["resultado"] = "G" if ((sa > sb) if home else (sb > sa)) else "P"
+        pk["marcador"] = f"{sa}-{sb}" if home else f"{sb}-{sa}"
+        fin = f"Resultado: {'✅ ganado' if pk['resultado'] == 'G' else '❌ perdido'} {pk['marcador']}"
+    else:
+        fin = "El resultado se apuntará solo."
     send(f"✅ Registrado a mano: {pick} vs {rival} · "
-         f"{datetime.fromtimestamp(m['t'], tt_feed.TZ).strftime('%H:%M')} @ {cuota:.2f} · "
-         f"{apuesta:.0f} €\nEl resultado se apuntará solo.", reply_to)
+         f"{datetime.fromtimestamp(m['t'], tt_feed.TZ).strftime('%d/%m %H:%M')} @ {cuota:.2f} · "
+         f"{apuesta:.0f} €\n{fin}", reply_to)
     return True
 
 
@@ -554,15 +585,83 @@ def worth_heads_up(r, g):
     return True
 
 
+# marcadores posibles de un set, del mas amplio al mas ajustado
+SET_SCORES = [(11, k) for k in range(10)] + [(k + 2, k) for k in range(10, 15)]
+
+
+def _pick_with_points(r, g, pm, f, pa, pb):
+    """¿Hay pick seguro si 'pm' acaba 'f' con estos puntos totales?"""
+    ms = [Match(x.a, x.b, x.order, time=x.time, final=f, points=(pa, pb), mid=x.mid)
+          if x is pm else x for x in g.matches]
+    g2 = Group(g.players, ms)
+    m2 = next(x for x in g2.matches if x.order == r["match"].order)
+    r2 = g2._eval_match(m2, {})
+    return bool(r2 and r2["pick"] == r["pick"] and not r2["warn"]
+                and kind(r2) == "OFICIAL")
+
+
+def pts_scan(r, g, pm, f):
+    """Cuando el desempate depende de los PUNTOS del partido decisivo, prueba
+    marcadores posibles. Devuelve 'si', 'no' o un texto con la condicion."""
+    done = getattr(pm, "done_pts", None) or (0, 0)
+    la, lb = pm.live if pm.live else (0, 0)
+    left_a, left_b = f[0] - la, f[1] - lb          # sets que faltan a cada uno
+    if left_a < 0 or left_b < 0 or left_a + left_b < 1:
+        return "no"
+    win_a = f[0] > f[1]
+    wname = pm.a if win_a else pm.b
+    if left_a + left_b == 1:
+        # solo falta UN set: se prueban todos sus marcadores
+        res = []
+        for w, l in SET_SCORES:
+            pa = done[0] + (w if win_a else l)
+            pb = done[1] + (l if win_a else w)
+            res.append(((w, l), _pick_with_points(r, g, pm, f, pa, pb)))
+        ok = [sc for sc, v in res if v]
+        if len(ok) == len(res):
+            return "si"
+        if not ok:
+            return "no"
+        amplio = [sc for sc in ok if sc[0] == 11]
+        if ok == [sc for sc, _ in res][:len(ok)]:
+            u = ok[-1]
+            return f"PICK si {wname} gana el set {u[0]}-{u[1]} o más amplio"
+        if ok == [sc for sc, _ in res][-len(ok):]:
+            u = ok[0]
+            return f"PICK si {wname} gana el set ajustado: {u[0]}-{u[1]} o más reñido"
+        return "depende de los puntos exactos del set"
+    # faltan varios sets: se prueban muchas combinaciones de marcadores de esos sets
+    from itertools import product as _prod
+    opts = [(11, 0), (11, 6), (11, 9), (16, 14)]
+    wl, ll = (left_a, left_b) if win_a else (left_b, left_a)
+    out = set()
+    for wins in _prod(opts, repeat=wl):
+        for losses in _prod(opts, repeat=ll):
+            pw = sum(x for x, _ in wins) + sum(y for _, y in losses)
+            pl = sum(y for _, y in wins) + sum(x for x, _ in losses)
+            pa = done[0] + (pw if win_a else pl)
+            pb = done[1] + (pl if win_a else pw)
+            out.add(_pick_with_points(r, g, pm, f, pa, pb))
+            if len(out) == 2:
+                return "dependerá de los puntos (te digo en el último set)"
+    return "si" if out == {True} else "no"
+
+
 def outcome(r, g, pm, f):
     """Que pasa con el pick si el partido decisivo 'pm' acaba exactamente 'f'.
-    Devuelve (simbolo, texto corto)."""
+    Devuelve (simbolo, texto corto). ⚖️ = depende de los puntos de ese partido."""
     m = r["match"]
     r2 = g._eval_match(m, {pm.order: [f]})
-    if not r2 or r2["pick"] != r["pick"]:
-        return "❌", "no hay pick seguro"
-    if r2["warn"]:
-        return "❌", "lo deciden los puntos"
+    if not r2 or r2["pick"] != r["pick"] or r2["warn"]:
+        sc = pts_scan(r, g, pm, f)
+        if sc == "si":
+            r2 = dict(r, warn=False)
+        elif sc != "no":
+            return "⚖️", sc
+        elif r2 and r2["pick"] == r["pick"]:
+            return "❌", "lo deciden los puntos"
+        else:
+            return "❌", "no hay pick seguro"
     if kind(r2) != "OFICIAL":
         return "❌", "solo potencial"
     rs = rival_sets(g, r2["vs"]) + ((f[0] if pm.a == r2["vs"] else f[1])
@@ -610,8 +709,21 @@ def closing_set_text(r, pm, g):
         if sym == "✅":
             lines.append(f"✅ Si gana {p} ({res}) → {txt.replace('pick', 'PICK OFICIAL ' + r['pick'].upper())}"
                          f" · apuesta YA")
+        elif sym == "⚖️":
+            lines.append(f"⚖️ Si gana {p} ({res}) → {txt.replace('PICK', 'PICK OFICIAL ' + r['pick'].upper())}"
+                         f" · espera: te confirmo al acabar")
         else:
             lines.append(f"❌ Si gana {p} ({res}) → NO apuestes ({txt})")
+    if min(sa, sb) < 2:
+        # el partido aun puede alargarse: mapa de TODOS los finales posibles
+        mapa = []
+        for p in (pm.a, pm.b):
+            for f in pm.possible_finals():
+                if (f[0] > f[1]) != (p == pm.a):
+                    continue
+                sym, _ = outcome(r, g, pm, f)
+                mapa.append(f"{p.split()[0]} {max(f)}-{min(f)} {sym}")
+        lines.append("📋 Todos los casos: " + " · ".join(mapa))
     lines.append(f"Partido del pick: {m.time}")
     return "\n".join(lines)
 
@@ -807,13 +919,15 @@ def tick():
                     # posibles revisados uno a uno (nunca un "gane quien gane" a medias).
                     # Con 2 sets de alguno ya va el SET DECISIVO, que es aun mas exacto.
                     alerted[f"{m.mid}|{r['pick']}"] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                        "pick": r["pick"], "hora": m.time, "ts": time.time()}
+                        "pick": r["pick"], "hora": m.time, "ts": time.time(),
+                        "vs": r["vs"], "reason": r["reason"]}
                     once(f"H|{m.mid}|{r['pick']}|{pm.mid}",
                          lambda r=r, pm=pm, g=g: full_heads_up_text(r, pm, g))
                 if pm.live and max(pm.live) == 2:
                     # set que puede cerrar el partido: respuesta exacta por resultado
                     alerted[f"{m.mid}|{r['pick']}"] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                        "pick": r["pick"], "hora": m.time, "ts": time.time()}
+                        "pick": r["pick"], "hora": m.time, "ts": time.time(),
+                        "vs": r["vs"], "reason": r["reason"]}
                     once(f"F|{m.mid}|{r['pick']}|{pm.mid}|{pm.live[0]}-{pm.live[1]}",
                          lambda r=r, pm=pm, g=g: closing_set_text(r, pm, g))
 
@@ -827,6 +941,25 @@ def tick():
             continue                         # todavía puede salir
         pmx = pstat.get(al["pm"])
         mid_pick = key.split("|")[0]
+        # ¿sigue siendo posible segun los PUNTOS del partido decisivo en juego?
+        # (el motor no puede saberlo hasta que acabe: aqui se prueban marcadores)
+        if al.get("vs"):
+            gx = next((g for g in groups if any(x.mid == mid_pick for x in g.matches)
+                       and any(x.mid == al["pm"] for x in g.matches)), None)
+            if gx:
+                mx = next(x for x in gx.matches if x.mid == mid_pick)
+                px = next(x for x in gx.matches if x.mid == al["pm"])
+                if not px.final and not mx.final and px.live is not None:
+                    rx = dict(match=mx, pick=al["pick"], vs=al["vs"],
+                              reason=al.get("reason", f"{al['vs']} ya eliminado"),
+                              warn=False, conds=[(px, "")])
+                    outs = [outcome(rx, gx, px, f)[0] for f in px.possible_finals()]
+                    if "✅" in outs or "⚖️" in outs:
+                        al["ts"] = time.time()
+                        if max(px.live) == 2:
+                            once(f"F|{mid_pick}|{al['pick']}|{px.mid}|{px.live[0]}-{px.live[1]}",
+                                 lambda rx=rx, px=px, gx=gx: closing_set_text(rx, px, gx))
+                        continue
         if mid_pick not in checked and time.time() - al.get("ts", 0) < 1200:
             # el grupo no se ha podido leer bien en esta vuelta (dato a medias de
             # la API): no se da por perdido, se espera a la siguiente lectura
