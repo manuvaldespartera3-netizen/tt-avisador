@@ -230,7 +230,54 @@ def delete_manual(text, reply_to):
     return True
 
 
-def read_replies(parsed=()):
+def ver_text(name, parsed, groups):
+    """'/ver Apellido' -> lo que el bot esta viendo AHORA del grupo de ese jugador."""
+    name = name.strip().lower()
+    if not name:
+        return "❓ Escríbelo así: /ver Apellido"
+    mine = [p for p in parsed if name in p["a"].lower() or name in p["b"].lower()]
+    if not mine:
+        return f"🔎 No veo ningún partido de hoy de '{name}' en los datos de Sofascore."
+    gs = [g for g in groups if any(name in pl.lower() for pl in g.players)]
+    L = []
+    for g in gs:
+        L.append("🔎 Grupo: " + " · ".join(g.players)
+                 + (" ⚠️ DATOS DUDOSOS (no se avisa)" if getattr(g, "dudoso", False) else ""))
+        for x in g.matches:
+            if x.final:
+                st = f"{x.final[0]}-{x.final[1]}"
+            elif x.live is not None:
+                st = f"en juego {x.live[0]}-{x.live[1]}"
+            else:
+                st = "por jugar"
+            L.append(f"  {x.order}. {x.time} {x.a} – {x.b}: {st}")
+        if not g.pending():
+            L.append("  Grupo terminado.")
+            continue
+        try:
+            res = g.analyze()
+        except Exception as ex:
+            res = []
+            L.append(f"  ❗ error al analizar: {ex}")
+        if not res:
+            L.append("  Análisis: ahora mismo no hay ningún pick posible.")
+        for r in res:
+            m = r["match"]
+            cond = " y ".join(f"gane {w}" for _, w in r["conds"]) or "seguro"
+            if r.get("partial"):
+                cond += f" ({r['partial']})"
+            L.append(f"  → {m.time} {kind(r)} {r['pick']} vs {r['vs']}: {cond}"
+                     + (" · ⚠️ puntos" if r["warn"] else ""))
+    sueltos = [p for p in mine if not any(p["id"] in {x.mid for x in g.matches} for g in groups)]
+    if sueltos:
+        L.append(f"🔎 Partidos de '{name}' que NO he podido meter en ningún grupo:")
+        for p in sorted(sueltos, key=lambda p: p["t"])[:8]:
+            h = datetime.fromtimestamp(p["t"], tt_feed.TZ).strftime("%H:%M")
+            L.append(f"  {h} {p['a']} – {p['b']}: {p['score']} ({p['status']})")
+    return "\n".join(L)[:3900]
+
+
+def read_replies(parsed=(), groups=()):
     """Lee lo que escribes al bot:
        - respondiendo a un pick: '1.45'  o  '1.45 120'  o  'no'
        - sin responder: se aplica al ultimo pick avisado que no tenga cuota
@@ -257,6 +304,9 @@ def read_replies(parsed=()):
             continue
         if text.startswith("/resumen"):
             send(summary_text(datetime.now(tt_feed.TZ).strftime("%Y-%m-%d")))
+            continue
+        if text.startswith("/ver"):
+            send(ver_text(" ".join(text.split()[1:]), parsed, groups), msg.get("message_id"))
             continue
         if text.startswith("/pick"):
             if manual_pick(text, parsed, msg.get("message_id")):
@@ -325,7 +375,8 @@ def startup_report():
              "Solo OFICIALES · ⭐ = alta calidad · cada pick trae su cuota mínima",
              "✍️ Responde a cada pick con tu cuota (ej. 1.45) · /resumen = resumen al momento",
              "✍️ /pick Apellido Rival 1.88 = registrar a mano un pick que apostaste",
-             "🗑 /borrar Apellido Rival = quitar un pick puesto a mano"]
+             "🗑 /borrar Apellido Rival = quitar un pick puesto a mano",
+             "🔎 /ver Apellido = lo que el bot ve ahora del grupo de ese jugador"]
     try:
         events, live = fetch()
         groups, parsed = build_groups(events)
@@ -600,9 +651,23 @@ def _pick_with_points(r, g, pm, f, pa, pb):
                 and kind(r2) == "OFICIAL")
 
 
+_SCAN = {}
+
+
 def pts_scan(r, g, pm, f):
     """Cuando el desempate depende de los PUNTOS del partido decisivo, prueba
-    marcadores posibles. Devuelve 'si', 'no' o un texto con la condicion."""
+    marcadores posibles. Devuelve 'si', 'no' o un texto con la condicion.
+    (Se guarda el resultado: con el grupo igual no se vuelve a calcular.)"""
+    key = (r["pick"], r["match"].order, pm.order, f,
+           tuple((x.final, x.points, x.live, getattr(x, "done_pts", None)) for x in g.matches))
+    if key not in _SCAN:
+        if len(_SCAN) > 5000:
+            _SCAN.clear()
+        _SCAN[key] = _pts_scan(r, g, pm, f)
+    return _SCAN[key]
+
+
+def _pts_scan(r, g, pm, f):
     done = getattr(pm, "done_pts", None) or (0, 0)
     la, lb = pm.live if pm.live else (0, 0)
     left_a, left_b = f[0] - la, f[1] - lb          # sets que faltan a cada uno
@@ -632,8 +697,9 @@ def pts_scan(r, g, pm, f):
         return "depende de los puntos exactos del set"
     # faltan varios sets: se prueban muchas combinaciones de marcadores de esos sets
     from itertools import product as _prod
-    opts = [(11, 0), (11, 6), (11, 9), (16, 14)]
     wl, ll = (left_a, left_b) if win_a else (left_b, left_a)
+    # con muchos sets por jugar se usan menos marcadores (si no, tarda demasiado)
+    opts = [(11, 0), (11, 6), (11, 9), (16, 14)] if wl + ll <= 3 else [(11, 0), (11, 9), (16, 14)]
     out = set()
     for wins in _prod(opts, repeat=wl):
         for losses in _prod(opts, repeat=ll):
@@ -688,6 +754,33 @@ def full_heads_up_text(r, pm, g):
         if parts:
             lines.append(f"Si gana {p}:  " + "  ·  ".join(parts))
     lines.append("Espera al 🔔 SET DECISIVO: ahí te digo si apostar.")
+    return "\n".join(lines)
+
+
+def preview_text(r, pm, g):
+    """PREAVISO: posible pick y que tiene que pasar en el partido del que depende."""
+    m = r["match"]
+    when = f" ({pm.time})" if pm.time else ""
+    if pm.live:
+        when = f" (va {pm.live[0]}-{pm.live[1]})"
+    lines = [f"📋 POSIBLE PICK OFICIAL {r['pick'].upper()} vs {r['vs']} · {m.time}",
+             f"Depende de {pm.a} – {pm.b}{when}:"]
+    for p in (pm.a, pm.b):
+        res = [(f, outcome(r, g, pm, f)) for f in pm.possible_finals()
+               if (f[0] > f[1]) == (p == pm.a)]
+        if not res:
+            continue
+        syms = {o[0] for _, o in res}
+        if syms == {"✅"}:
+            lines.append(f"✅ Si gana {p} (cualquier resultado) → {res[0][1][1]}")
+        elif syms == {"❌"}:
+            lines.append(f"❌ Si gana {p} → no hay pick")
+        else:
+            lines.append(f"Si gana {p}: " + " · ".join(
+                f"{o[0]} {max(f)}-{min(f)}" for f, o in res))
+    if any(o[0] == "⚖️" for f in pm.possible_finals() for o in [outcome(r, g, pm, f)]):
+        lines.append("⚖️ = depende de los puntos: te lo concreto en el set decisivo")
+    lines.append("Aún NO apuestes: te confirmo en cuanto acabe ese partido.")
     return "\n".join(lines)
 
 
@@ -839,7 +932,7 @@ def tick():
         send("\n".join(lines))
 
     update_results(parsed)
-    read_replies(parsed)
+    read_replies(parsed, groups)
     maybe_daily_summary()
 
     sent = set(state["sent"])
@@ -914,7 +1007,19 @@ def tick():
                     HOT["on"] = True      # partido decisivo en juego: mirar cada 15 s
                     HOT["ids"].add(pm.mid)
                     HOT["last"] = time.time()
-                if in_late_stage(pm) and max(pm.live) < 2:
+                akey = f"{m.mid}|{r['pick']}"
+                if not pm.final and f"P|{akey}|{pm.mid}" not in sent \
+                        and not (pm.live and max(pm.live) == 2):   # entonces ya va el 🔔
+                    # PREAVISO con antelacion: en cuanto se sabe que puede haber pick,
+                    # con TODOS los resultados posibles del partido del que depende
+                    syms = {outcome(r, g, pm, f)[0] for f in pm.possible_finals()}
+                    if "✅" in syms or "⚖️" in syms:
+                        alerted[akey] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
+                            "pick": r["pick"], "hora": m.time, "ts": time.time(),
+                            "vs": r["vs"], "reason": r["reason"]}
+                        once(f"P|{akey}|{pm.mid}",
+                             lambda r=r, pm=pm, g=g: preview_text(r, pm, g))
+                if in_late_stage(pm) and max(pm.live) < 2 and f"P|{akey}|{pm.mid}" not in sent:
                     # Un solo aviso por partido decisivo, con TODOS los resultados
                     # posibles revisados uno a uno (nunca un "gane quien gane" a medias).
                     # Con 2 sets de alguno ya va el SET DECISIVO, que es aun mas exacto.

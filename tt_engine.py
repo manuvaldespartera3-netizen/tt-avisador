@@ -216,6 +216,12 @@ class Group:
         pend = self.pending()
         for i, m in enumerate(pend):
             before = pend[:i]
+            if before:
+                # ¿pick pase lo que pase en los partidos previos? -> seguro desde ya
+                r0 = self._eval_match(m, {})
+                if r0 and not r0["warn"]:      # solo si es seguro del todo (sin puntos)
+                    out.append(dict(match=m, conds=[], partial=False, **r0))
+                    continue
             # condiciones: ganador de cada partido previo pendiente
             choices = []
             for pm in before:
