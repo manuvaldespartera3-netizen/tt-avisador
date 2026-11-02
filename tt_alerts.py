@@ -944,6 +944,35 @@ def tick():
         state["sent"].append(key)
         send(text_fn())
 
+    def cond_alert(r, m, pm, g):
+        """Avisos de un pick que depende del partido 'pm': preaviso, ATENTO y 🔔.
+        Solo si con algun resultado de 'pm' sale un pick APOSTABLE (✅ o ⚖️)."""
+        if pm.final:
+            return
+        outs = {f: outcome(r, g, pm, f) for f in pm.possible_finals()}
+        if not any(o[0] in ("✅", "⚖️") for o in outs.values()):
+            return
+        akey = f"{m.mid}|{r['pick']}"
+        if pm.live is not None:
+            HOT["on"] = True      # partido decisivo en juego: mirar cada 15 s
+            HOT["ids"].add(pm.mid)
+            HOT["last"] = time.time()
+        info = {"pm": pm.mid, "a": pm.a, "b": pm.b, "pick": r["pick"], "hora": m.time,
+                "ts": time.time(), "vs": r["vs"], "reason": r["reason"]}
+        pkey = f"P|{akey}|{pm.mid}"
+        if pkey not in sent and not (pm.live and max(pm.live) == 2):   # entonces ya va el 🔔
+            # PREAVISO con antelacion, con TODOS los resultados posibles
+            alerted[akey] = info
+            once(pkey, lambda r=r, pm=pm, g=g: preview_text(r, pm, g))
+        if in_late_stage(pm) and max(pm.live) < 2 and pkey not in sent:
+            alerted[akey] = info
+            once(f"H|{akey}|{pm.mid}", lambda r=r, pm=pm, g=g: full_heads_up_text(r, pm, g))
+        if pm.live and max(pm.live) == 2:
+            # set que puede cerrar el partido: respuesta exacta por resultado
+            alerted[akey] = info
+            once(f"F|{akey}|{pm.mid}|{pm.live[0]}-{pm.live[1]}",
+                 lambda r=r, pm=pm, g=g: closing_set_text(r, pm, g))
+
     valid = set()        # (match_id, pick) que siguen siendo pick ahora mismo
     cands = set()        # "match|pick" que todavia pueden ser pick
     alerted = state.setdefault("alerted", {})   # avisos ATENTO pendientes de resolver
@@ -1000,41 +1029,20 @@ def tick():
                                       + "\n✍️ Responde con tu cuota (ej. 1.45) o 'no'")
                     register_pick(r, hh, early, cal, avisar, mid_tg)
             elif len(r["conds"]) == 1 and m.live is None:
-                if not worth_heads_up(r, g):
+                cond_alert(r, m, r["conds"][0][0], g)
+        # Picks que SOLO pueden salir por los puntos del partido anterior: el motor
+        # no los ve hasta que ese partido acaba (los puntos aun no existen). Se
+        # prueban aqui, marcador a marcador, para avisar con antelacion igualmente.
+        pend = g.pending()
+        if len(pend) >= 2 and pend[1].live is None:
+            pm, m = pend[0], pend[1]
+            have = {r["pick"] for r in results if r["match"] is m}
+            for pick, vs in ((m.a, m.b), (m.b, m.a)):
+                if pick in have:
                     continue
-                pm, w = r["conds"][0]
-                if pm.live is not None:
-                    HOT["on"] = True      # partido decisivo en juego: mirar cada 15 s
-                    HOT["ids"].add(pm.mid)
-                    HOT["last"] = time.time()
-                akey = f"{m.mid}|{r['pick']}"
-                if not pm.final and f"P|{akey}|{pm.mid}" not in sent \
-                        and not (pm.live and max(pm.live) == 2):   # entonces ya va el 🔔
-                    # PREAVISO con antelacion: en cuanto se sabe que puede haber pick,
-                    # con TODOS los resultados posibles del partido del que depende
-                    syms = {outcome(r, g, pm, f)[0] for f in pm.possible_finals()}
-                    if "✅" in syms or "⚖️" in syms:
-                        alerted[akey] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                            "pick": r["pick"], "hora": m.time, "ts": time.time(),
-                            "vs": r["vs"], "reason": r["reason"]}
-                        once(f"P|{akey}|{pm.mid}",
-                             lambda r=r, pm=pm, g=g: preview_text(r, pm, g))
-                if in_late_stage(pm) and max(pm.live) < 2 and f"P|{akey}|{pm.mid}" not in sent:
-                    # Un solo aviso por partido decisivo, con TODOS los resultados
-                    # posibles revisados uno a uno (nunca un "gane quien gane" a medias).
-                    # Con 2 sets de alguno ya va el SET DECISIVO, que es aun mas exacto.
-                    alerted[f"{m.mid}|{r['pick']}"] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                        "pick": r["pick"], "hora": m.time, "ts": time.time(),
-                        "vs": r["vs"], "reason": r["reason"]}
-                    once(f"H|{m.mid}|{r['pick']}|{pm.mid}",
-                         lambda r=r, pm=pm, g=g: full_heads_up_text(r, pm, g))
-                if pm.live and max(pm.live) == 2:
-                    # set que puede cerrar el partido: respuesta exacta por resultado
-                    alerted[f"{m.mid}|{r['pick']}"] = {"pm": pm.mid, "a": pm.a, "b": pm.b,
-                        "pick": r["pick"], "hora": m.time, "ts": time.time(),
-                        "vs": r["vs"], "reason": r["reason"]}
-                    once(f"F|{m.mid}|{r['pick']}|{pm.mid}|{pm.live[0]}-{pm.live[1]}",
-                         lambda r=r, pm=pm, g=g: closing_set_text(r, pm, g))
+                rx = dict(match=m, pick=pick, vs=vs, reason=f"{vs} ya eliminado",
+                          warn=False, conds=[(pm, "")])
+                cond_alert(rx, m, pm, g)
 
     # si se avisó "ATENTO" y ese pick ya no es posible, decirlo claro
     pstat = {p["id"]: p for p in parsed}
@@ -1054,14 +1062,14 @@ def tick():
             if gx:
                 mx = next(x for x in gx.matches if x.mid == mid_pick)
                 px = next(x for x in gx.matches if x.mid == al["pm"])
-                if not px.final and not mx.final and px.live is not None:
+                if not px.final and not mx.final:
                     rx = dict(match=mx, pick=al["pick"], vs=al["vs"],
                               reason=al.get("reason", f"{al['vs']} ya eliminado"),
                               warn=False, conds=[(px, "")])
                     outs = [outcome(rx, gx, px, f)[0] for f in px.possible_finals()]
                     if "✅" in outs or "⚖️" in outs:
                         al["ts"] = time.time()
-                        if max(px.live) == 2:
+                        if px.live and max(px.live) == 2:
                             once(f"F|{mid_pick}|{al['pick']}|{px.mid}|{px.live[0]}-{px.live[1]}",
                                  lambda rx=rx, px=px, gx=gx: closing_set_text(rx, px, gx))
                         continue
