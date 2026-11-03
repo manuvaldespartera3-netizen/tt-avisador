@@ -479,6 +479,9 @@ def table_line(g):
 
 def register_pick(r, hh, early=False, cal="", enviado=True, msg_id=None):
     m = r["match"]
+    if any(p.get("match_id") == m.mid and p.get("pick") == r["pick"]
+           and p.get("tipo") != "OFICIAL B" for p in picks):
+        return          # ya estaba apuntado (nunca dos veces el mismo pick)
     picks.append({"momento": "vivo" if early else "antes", "msg_id": msg_id or "",
                   "calidad": cal, "enviado": "si" if enviado else "no",
                   "fecha": datetime.now(tt_feed.TZ).strftime("%Y-%m-%d"), "hora": m.time,
@@ -947,8 +950,8 @@ def tick():
     def cond_alert(r, m, pm, g):
         """Avisos de un pick que depende del partido 'pm': preaviso, ATENTO y 🔔.
         Solo si con algun resultado de 'pm' sale un pick APOSTABLE (✅ o ⚖️)."""
-        if pm.final:
-            return
+        if pm.final or len(g.pending()) > 3:
+            return      # grupo aun al principio: no hay picks posibles y saldria carisimo
         outs = {f: outcome(r, g, pm, f) for f in pm.possible_finals()}
         if not any(o[0] in ("✅", "⚖️") for o in outs.values()):
             return
@@ -983,6 +986,10 @@ def tick():
         if getattr(g, "dudoso", False):
             # algun resultado del grupo no cuadra en la API: no se avisa de nada
             print("Grupo con datos dudosos, se omite:", g.players)
+            continue
+        if len(g.pending()) > 3:
+            # con 2 partidos jugados o menos nadie puede estar ya eliminado ni
+            # clasificado: no hay picks posibles y analizarlo es lo mas lento
             continue
         checked |= {m.mid for m in g.matches}
         results = g.analyze()
@@ -1034,7 +1041,7 @@ def tick():
         # no los ve hasta que ese partido acaba (los puntos aun no existen). Se
         # prueban aqui, marcador a marcador, para avisar con antelacion igualmente.
         pend = g.pending()
-        if len(pend) >= 2 and pend[1].live is None:
+        if 2 <= len(pend) <= 3 and pend[1].live is None:
             pm, m = pend[0], pend[1]
             have = {r["pick"] for r in results if r["match"] is m}
             for pick, vs in ((m.a, m.b), (m.b, m.a)):
