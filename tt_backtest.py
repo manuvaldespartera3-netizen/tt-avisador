@@ -369,8 +369,122 @@ def run():
                 dif_puntos=(((x["points"][0] - x["points"][1]) * (1 if pick_home else -1))
                             if x.get("points") else "")))
     rows.sort(key=lambda z: (z["fecha"], z["hora"]))
+    try:
+        tb = tiebreak_check(parsed, [(p, ms) for p, ms in groups if ms[0]["t"] >= first_pick_ts
+                                     and not any(x.get("dudoso") for x in ms)])
+    except Exception as ex:
+        print("WARN desempate", ex)
+        tb = {"casos": 0}
     return rows, dict(partidos=len(parsed), grupos=n_groups, dudosos=dudosos,
-                      desde=(end - timedelta(days=DAYS - 1)), hasta=end)
+                      desde=(end - timedelta(days=DAYS - 1)), hasta=end, desempate=tb)
+
+
+# ------------------------------------------------- comprobar el desempate real
+def tiebreak_check(parsed, groups):
+    """Mira en los grupos REALES con empate a puntos en la frontera 2.º/3.º quién
+    jugó de verdad la final (los 2 primeros) y lo compara con dos reglas:
+      ITTF  = solo cuentan los partidos entre los empatados (sets y luego puntos)
+      TOTAL = cuentan los sets (y luego los puntos) de TODO el grupo
+    Los 2 primeros juegan la final y los otros 2 el 3.er puesto (Final games)."""
+    from tt_engine import _rank
+    by_t = sorted(parsed, key=lambda x: x["t"])
+    stats = {"casos": 0, "ittf": 0, "total": 0, "distintas": 0,
+             "dist_ittf": 0, "dist_total": 0, "ejemplos": []}
+    for players, ms in groups:
+        pts = {p: 0 for p in players}
+        sw = {p: 0 for p in players}
+        sl = {p: 0 for p in players}
+        pw = {p: 0 for p in players}
+        pl = {p: 0 for p in players}
+        res = {}
+        for x in ms:
+            sa, sb = x["final"]
+            w, l = (x["a"], x["b"]) if sa > sb else (x["b"], x["a"])
+            pts[w] += 2
+            pts[l] += 1
+            sw[x["a"]] += sa; sl[x["a"]] += sb; sw[x["b"]] += sb; sl[x["b"]] += sa
+            pa, pb = x["points"] if x.get("points") else (None, None)
+            if pa is not None:
+                pw[x["a"]] += pa; pl[x["a"]] += pb; pw[x["b"]] += pb; pl[x["b"]] += pa
+            res[frozenset((x["a"], x["b"]))] = (x["a"], x["b"], sa, sb, pa, pb)
+        orden = sorted(players, key=lambda p: -pts[p])
+        if pts[orden[1]] != pts[orden[2]]:
+            continue                      # sin empate en la frontera: no informa
+        # Final games: los 2 siguientes partidos entre estos 4 jugadores
+        ids = {x["id"] for x in ms}
+        fin = [x for x in by_t if ms[-1]["t"] < x["t"] <= ms[-1]["t"] + 3 * 3600
+               and x["id"] not in ids and {x["a"], x["b"]} <= set(players)]
+        pares = []
+        for x in fin:
+            pr = frozenset((x["a"], x["b"]))
+            if all(not (pr & q) for q in pares):
+                pares.append(pr)
+            if len(pares) == 2:
+                break
+        if len(pares) != 2:
+            continue
+        s0, s1 = (sum(pts[p] for p in q) for q in pares)
+        if s0 == s1:
+            continue
+        real = pares[0] if s0 > s1 else pares[1]
+        # regla ITTF (la del bot)
+        tiers = _rank(players, res)
+        top, pos = [], 0
+        ok_ittf = None
+        for t in tiers:
+            if pos + len(t) <= 2:
+                top += t
+            elif pos < 2:
+                top = None          # empate sin resolver en la frontera
+                break
+            pos += len(t)
+        if top is not None:
+            ok_ittf = set(top) == set(real)
+        # regla TOTAL (sets de todo el grupo, luego puntos de todo el grupo)
+        def key(p):
+            return (pts[p], (sw[p] / sl[p]) if sl[p] else 99, (pw[p] / pl[p]) if pl[p] else 99)
+        tt = sorted(players, key=key, reverse=True)
+        ok_total = (set(tt[:2]) == set(real)) if key(tt[1]) != key(tt[2]) else None
+        if ok_ittf is None or ok_total is None:
+            continue
+        stats["casos"] += 1
+        stats["ittf"] += ok_ittf
+        stats["total"] += ok_total
+        if top is not None and set(top) != set(tt[:2]):
+            stats["distintas"] += 1
+            stats["dist_ittf"] += ok_ittf
+            stats["dist_total"] += ok_total
+            if len(stats["ejemplos"]) < 6:
+                d = datetime.fromtimestamp(ms[0]["t"], TZ).strftime("%d/%m %H:%M")
+                stats["ejemplos"].append(
+                    f"   {d} · {' · '.join(f'{p} {pts[p]}' for p in orden)} → "
+                    f"final real: {' y '.join(sorted(real))} · "
+                    f"ITTF dice {' y '.join(sorted(top))} {'✅' if ok_ittf else '❌'} · "
+                    f"TOTAL dice {' y '.join(sorted(tt[:2]))} {'✅' if ok_total else '❌'}")
+    return stats
+
+
+def tiebreak_lines(st):
+    L = ["=" * 60, "⚖️ ¿QUÉ DESEMPATE USA DE VERDAD LA LIGA?", "=" * 60,
+         "• ITTF = solo cuentan los partidos ENTRE los empatados (lo que usa el bot)",
+         "• TOTAL = cuentan los sets de TODO el grupo",
+         "• Se mira quién jugó de verdad la final (los 2 primeros) en los grupos",
+         "  con empate a puntos entre el 2.º y el 3.º."]
+    if not st["casos"]:
+        L.append("   Sin casos suficientes.")
+        return L
+    L.append(f"   Grupos con empate comprobados: {st['casos']}")
+    L.append(f"   Acierta ITTF: {st['ittf']} de {st['casos']} · Acierta TOTAL: {st['total']} de {st['casos']}")
+    L.append(f"   Casos donde las dos reglas dan distinto: {st['distintas']}")
+    if st["distintas"]:
+        L.append(f"   → en esos acierta ITTF {st['dist_ittf']} y TOTAL {st['dist_total']}")
+        L.extend(st["ejemplos"])
+    if st["distintas"] >= 3:
+        if st["dist_ittf"] > st["dist_total"]:
+            L.append("   ✅ CONCLUSIÓN: la liga usa la regla ITTF (la del bot).")
+        elif st["dist_total"] > st["dist_ittf"]:
+            L.append("   ❗ CONCLUSIÓN: la liga usa los SETS DE TODO EL GRUPO. Hay que cambiar el bot.")
+    return L
 
 
 # ------------------------------------------------------------- estadistica
@@ -510,6 +624,8 @@ def report(rows, info):
                 ok = "✅" if pte >= ptr - 0.05 else "❌ no se mantiene"
                 L.append(f"   · {name}: {ptr*100:.0f}% ({ntr}) → después {pte*100:.0f}% ({nte}) {ok}")
     L.append("")
+    L.extend(tiebreak_lines(info.get("desempate") or {"casos": 0}))
+    L.append("")
     L.extend(handicap_report(rows))
     L.append("")
     L.append("VEREDICTO")
@@ -627,6 +743,11 @@ def telegram_summary(rows, info):
         g = sum(1 for r in of if r["dif_puntos"] > 4.5)
         L.append(f"🎯 OFICIAL -4,5 puntos: {g / len(of) * 100:.0f}% · cuota mínima {len(of) / max(g, 1):.2f}")
         L.extend(hc_compare([r for r in rows if r["tipo"] == "OFICIAL"]))
+    tb = info.get("desempate") or {"casos": 0}
+    if tb.get("casos"):
+        L.append(f"⚖️ Desempate real: {tb['casos']} grupos · acierta ITTF {tb['ittf']} · "
+                 f"acierta TOTAL {tb['total']} · donde difieren ({tb['distintas']}): "
+                 f"ITTF {tb['dist_ittf']} / TOTAL {tb['dist_total']}")
     L.append("Informe completo y lista de picks en los archivos 👇")
     return "\n".join(L)
 
