@@ -64,7 +64,12 @@ def _rank(players, res):
 
 
 def _resolve_lp(grp, res):
-    """Desempate tipo Liga Pro con estadisticas de TODO el grupo."""
+    """Desempate oficial de Liga Pro (reglamento tt.league-pro.com, §2.6.1),
+    con estadisticas de TODO el grupo, en este orden:
+      1. sets ganados  2. diferencia de sets  3. diferencia de puntos
+      4. puntos ganados  5. enfrentamiento directo (solo si quedan 2)  6. sorteo
+    Si para decidir hacen falta puntos que aun no se conocen (partidos sin
+    jugar), el empate queda SIN resolver (nunca se salta al directo)."""
     if len(grp) == 1:
         return [grp]
     st = {p: [0, 0, 0, 0] for p in grp}      # sets ganados, dif sets, dif puntos, puntos
@@ -79,20 +84,21 @@ def _resolve_lp(grp, res):
                 else:
                     st[p][2] += mp - op
                     st[p][3] += mp
-    keys = [0, 1] + ([2, 3] if pts_known else [])
 
     def split(g, k):
-        if k >= len(keys):
+        if k >= 2 and not pts_known:
+            return [g]                      # lo deciden puntos que aun no existen
+        if k >= 4:
             if len(g) == 2:
                 r = res.get(frozenset(g))
                 if r:
                     win = r[0] if r[2] > r[3] else r[1]
                     return [[win], [g[1] if win == g[0] else g[0]]]
-            return [g]
-        vals = sorted({st[p][keys[k]] for p in g}, reverse=True)
+            return [g]                      # sorteo / sin resolver
+        vals = sorted({st[p][k] for p in g}, reverse=True)
         out = []
         for v in vals:
-            sub = [p for p in g if st[p][keys[k]] == v]
+            sub = [p for p in g if st[p][k] == v]
             out.extend([sub] if len(sub) == 1 else split(sub, k + 1))
         return out
     return split(list(grp), 0)

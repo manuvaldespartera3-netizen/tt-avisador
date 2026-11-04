@@ -1,5 +1,6 @@
 """
-tt_alerts.py - Avisador TT Cup -> Telegram (pensado para GitHub Actions).
+tt_alerts.py - Avisador de grupos (TT Cup y Liga Pro) -> Telegram (GitHub Actions).
+La liga se elige con variables de entorno (TT_TOURNAMENT_ID, TT_TIEBREAK, LIGA_NOMBRE...).
 
 Cada ejecucion consulta la API varias veces (cada POLL_SECONDS) durante
 RUN_SECONDS y termina. GitHub la relanza cada 5 minutos. Lo ya enviado se
@@ -28,6 +29,12 @@ from tt_tipo_b import eval_b
 
 TG = os.getenv("TELEGRAM_TOKEN", "").strip()
 CHAT = os.getenv("MY_CHAT_ID", "").strip()
+# --- ajustes por liga (por defecto, TT Cup tal cual) ---
+LIGA = os.getenv("LIGA_NOMBRE", "TT Cup")
+LIGA_TAG = os.getenv("LIGA_TAG", "").strip()           # prefijo en cada mensaje (si se comparte chat)
+LEER_MENSAJES = os.getenv("LEER_MENSAJES", "1") == "1"  # leer cuotas, /pick, /ver...
+ESTRELLAS = os.getenv("ESTRELLAS", "1") == "1"          # categoria ⭐ (TT Cup si, Liga Pro no)
+FILTRO_NOCHE = os.getenv("FILTRO_NOCHE", "1") == "1"    # de noche solo ⭐ (TT Cup si, Liga Pro no)
 POLL = int(os.getenv("POLL_SECONDS", "60"))     # ritmo normal
 POLL_FAST = int(os.getenv("POLL_FAST", "15"))    # ritmo rapido cuando un pick esta a punto
 RUN = int(os.getenv("RUN_SECONDS", "320"))      # algo mas de 5 min: la siguiente ejecucion
@@ -38,12 +45,16 @@ POLL_EVENT = int(os.getenv("POLL_EVENT", "8"))   # segundos entre lecturas del p
 TEST = os.getenv("TEST_MODE", "1") == "1"
 REPORT_EVERY = 15 * 60
 STATE_FILE = os.getenv("STATE_FILE", "state.json")
-VERSION = "15"   # al cambiarlo se reenvia el mensaje de arranque
+VERSION = "16"   # al cambiarlo se reenvia el mensaje de arranque
 PICKS_FILE = os.getenv("PICKS_FILE", "picks.csv")
 SUMMARY_HOUR = os.getenv("SUMMARY_AT", "23:45")   # hora del resumen diario
 FIELDS = ["fecha", "hora", "tipo", "pick", "rival", "h2h_pick", "h2h_rival",
           "aviso_puntos", "match_id", "resultado", "marcador", "momento",
-          "calidad", "enviado", "cuota", "apuesta", "msg_id"]
+          "calidad", "enviado", "cuota", "apuesta", "msg_id",
+          "cuota_aviso", "cuota_cierre"]          # cuotas de Sofascore (automaticas)
+URL_ODDS = os.getenv(
+    "ZYLA_URL_ODDS",
+    "https://zylalabs.com/api/12787/sofascore+-+live+api/25097/get+match+odds")
 LIVE_PTS_MAX = int(os.getenv("LIVE_PTS_MAX", "8"))   # puntos jugados en el 1.er set
 
 state = {"sent": [], "last_report": 0, "last_error": "", "started": False, "urls": {},
@@ -88,6 +99,8 @@ def save_state():
 
 def send(text, reply_to=None):
     """Envia un mensaje y devuelve su id (para poder responderle luego)."""
+    if LIGA_TAG:
+        text = f"{LIGA_TAG}\n{text}"
     print(text, flush=True)
     if not (TG and CHAT):
         return None
@@ -102,6 +115,46 @@ def send(text, reply_to=None):
     except Exception as ex:
         print("WARN telegram", ex)
     return None
+
+
+def odds_now(mid, pick_home):
+    """Cuota del pick ahora mismo segun Sofascore (o '' si no hay)."""
+    if not tt_feed.KEY:
+        return ""
+    try:
+        data = tt_feed._call(URL_ODDS, match_id=mid)
+    except Exception as ex:
+        print("WARN odds", ex)
+        return ""
+    def markets(o):
+        if isinstance(o, dict):
+            if isinstance(o.get("markets"), list):
+                return o["markets"]
+            for v in o.values():
+                r = markets(v)
+                if r:
+                    return r
+        elif isinstance(o, list):
+            if o and isinstance(o[0], dict) and "choices" in o[0]:
+                return o
+            for v in o:
+                r = markets(v)
+                if r:
+                    return r
+        return []
+    for m in markets(data):
+        ch = {str(c.get("name")): c for c in m.get("choices", [])}
+        if set(ch) == {"1", "2"}:
+            c = ch["1" if pick_home else "2"]
+            v = c.get("value") or {}
+            dec = v.get("decimal") if isinstance(v, dict) else None
+            if dec:
+                return f"{float(dec):.2f}"
+            fr = c.get("fractionalValue") or (v.get("fractional") if isinstance(v, dict) else None)
+            if fr and "/" in str(fr):
+                a, b = str(fr).split("/")
+                return f"{1 + float(a) / float(b):.2f}"
+    return ""
 
 
 # ------------------------------------------------ cuotas que apuntas tu
@@ -242,7 +295,8 @@ def ver_text(name, parsed, groups):
     L = []
     for g in gs:
         L.append("🔎 Grupo: " + " · ".join(g.players)
-                 + (" ⚠️ DATOS DUDOSOS (no se avisa)" if getattr(g, "dudoso", False) else ""))
+                 + (f" ⚠️ PARECE GRUPO DE 5 (con {g.quinto}): no se avisa" if getattr(g, "quinto", None)
+                    else " ⚠️ DATOS DUDOSOS (no se avisa)" if getattr(g, "dudoso", False) else ""))
         for x in g.matches:
             if x.final:
                 st = f"{x.final[0]}-{x.final[1]}"
@@ -283,7 +337,7 @@ def read_replies(parsed=(), groups=()):
        - sin responder: se aplica al ultimo pick avisado que no tenga cuota
        - '/pick Apellido 1.88': registra a mano un pick que has apostado tu
        - '/resumen': manda el resumen al momento"""
-    if not (TG and CHAT):
+    if not (TG and CHAT and LEER_MENSAJES):
         return
     url = (f"https://api.telegram.org/bot{TG}/getUpdates?timeout=0"
            f"&offset={state.get('tg_offset', 0)}")
@@ -371,7 +425,7 @@ def euro_line(label, rows):
 
 
 def startup_report():
-    lines = ["🟢 Avisador TT Cup activo (v15)" + (" (MODO PRUEBA)" if TEST else ""),
+    lines = [f"🟢 Avisador {LIGA} activo (v16)" + (" (MODO PRUEBA)" if TEST else ""),
              "Solo OFICIALES · ⭐ = alta calidad · cada pick trae su cuota mínima",
              "✍️ Responde a cada pick con tu cuota (ej. 1.45) · /resumen = resumen al momento",
              "✍️ /pick Apellido Rival 1.88 = registrar a mano un pick que apostaste",
@@ -380,10 +434,10 @@ def startup_report():
     try:
         events, live = fetch()
         groups, parsed = build_groups(events)
-        lines.append(f"✅ Conexión con Zyla OK: {len(parsed)} partidos TT Cup hoy, "
+        lines.append(f"✅ Conexión con Zyla OK: {len(parsed)} partidos {LIGA} hoy, "
                      f"{live} en vivo, {len(groups)} grupos")
     except Exception as ex:
-        lines.append(f"❌ No pude leer TT Cup en Zyla: {ex}")
+        lines.append(f"❌ No pude leer {LIGA} en Zyla: {ex}")
     lines.append("✅ H2H activo" if tt_feed.URL_H2H else "⏳ H2H pendiente de configurar")
     send("\n".join(lines))
 
@@ -412,7 +466,8 @@ AVISAR_POTENCIAL = os.getenv("AVISAR_POTENCIAL", "0") == "1"
 
 
 def is_night(hhmm):
-    return bool(hhmm) and (hhmm >= "20:00" or hhmm < "06:00")
+    """Noche a efectos de filtro (si la liga no usa filtro de noche, nunca)."""
+    return FILTRO_NOCHE and bool(hhmm) and (hhmm >= "20:00" or hhmm < "06:00")
 
 
 def rival_sets(g, rival):
@@ -422,7 +477,7 @@ def rival_sets(g, rival):
 
 def quality(r, g):
     """'estrella', 'normal' o 'noche' (solo para OFICIAL)."""
-    if not r["warn"] and rival_sets(g, r["vs"]) <= 2:
+    if ESTRELLAS and not r["warn"] and rival_sets(g, r["vs"]) <= 2:
         return "estrella"
     return "noche" if is_night(r["match"].time) else "normal"
 
@@ -449,7 +504,7 @@ def confirm_text(r, g, hh, early=False):
     txt += f"\n{hline}"
     if r["warn"]:
         txt += "\n⚠️ puede decidir por puntos"
-    txt += f"\n🔎 Puntos: {table_line(g)} (compara con ttcup)"
+    txt += f"\n🔎 Puntos: {table_line(g)}"
     return txt
 
 
@@ -482,7 +537,9 @@ def register_pick(r, hh, early=False, cal="", enviado=True, msg_id=None):
     if any(p.get("match_id") == m.mid and p.get("pick") == r["pick"]
            and p.get("tipo") != "OFICIAL B" for p in picks):
         return          # ya estaba apuntado (nunca dos veces el mismo pick)
-    picks.append({"momento": "vivo" if early else "antes", "msg_id": msg_id or "",
+    cuota_sofa = odds_now(m.mid, r["pick"] == m.a) if kind(r) == "OFICIAL" else ""
+    picks.append({"cuota_aviso": cuota_sofa,
+                  "momento": "vivo" if early else "antes", "msg_id": msg_id or "",
                   "calidad": cal, "enviado": "si" if enviado else "no",
                   "fecha": datetime.now(tt_feed.TZ).strftime("%Y-%m-%d"), "hora": m.time,
                   "tipo": kind(r), "pick": r["pick"], "rival": r["vs"],
@@ -508,6 +565,8 @@ def update_results(parsed):
             won = (sa > sb) if pick_home else (sb > sa)
             pk["resultado"] = "G" if won else "P"
             pk["marcador"] = f"{sa}-{sb}" if pick_home else f"{sb}-{sa}"
+            if pk.get("tipo") == "OFICIAL" and not pk.get("cuota_cierre"):
+                pk["cuota_cierre"] = odds_now(pk["match_id"], pick_home)
             changed = True
         elif ev["status"] not in ("notstarted", "inprogress"):
             pk["resultado"] = "N"          # cancelado / no jugado
@@ -540,7 +599,7 @@ def summary_text(today):
     env = [p for p in picks if p.get("enviado") != "no"]          # los que te llegaron
     calla = [p for p in picks if p.get("enviado") == "no"]        # guardados sin avisar
     hoy = [p for p in env if p.get("fecha") == today]
-    lines = [f"📊 RESUMEN {today[8:10]}/{today[5:7]}"]
+    lines = [f"📊 RESUMEN {LIGA} {today[8:10]}/{today[5:7]}"]
     lines.append(_line("Hoy (avisados)", hoy))
     lines.append("")
     lines.append(_line("TOTAL avisados", env))
@@ -643,15 +702,32 @@ def worth_heads_up(r, g):
 SET_SCORES = [(11, k) for k in range(10)] + [(k + 2, k) for k in range(10, 15)]
 
 
+def win_sure(g, m, pick, fixed):
+    """¿Ganando 'm', 'pick' se clasifica SEGURO en todos los casos posibles?"""
+    wins = [f for f in m.possible_finals() if (f[0] > f[1]) == (pick == m.a)]
+    fx = dict(fixed)
+    fx[m.order] = wins
+    return all(st[pick] == "Q" for _, st in g.completions(fx))
+
+
+def safe_pick(g, m, pick, fixed):
+    """Pick OFICIAL de verdad: rival eliminado y, si gana, pasa SEGURO.
+    (Si solo hay duda con la derrota -perder ajustado y pasar igual-, vale.)"""
+    r2 = g._eval_match(m, fixed)
+    if not (r2 and r2["pick"] == pick and kind(r2) == "OFICIAL"):
+        return None
+    if r2["warn"] and not win_sure(g, m, pick, fixed):
+        return None
+    return r2
+
+
 def _pick_with_points(r, g, pm, f, pa, pb):
     """¿Hay pick seguro si 'pm' acaba 'f' con estos puntos totales?"""
     ms = [Match(x.a, x.b, x.order, time=x.time, final=f, points=(pa, pb), mid=x.mid)
           if x is pm else x for x in g.matches]
     g2 = Group(g.players, ms)
     m2 = next(x for x in g2.matches if x.order == r["match"].order)
-    r2 = g2._eval_match(m2, {})
-    return bool(r2 and r2["pick"] == r["pick"] and not r2["warn"]
-                and kind(r2) == "OFICIAL")
+    return bool(safe_pick(g2, m2, r["pick"], {}))
 
 
 _SCAN = {}
@@ -720,22 +796,22 @@ def outcome(r, g, pm, f):
     """Que pasa con el pick si el partido decisivo 'pm' acaba exactamente 'f'.
     Devuelve (simbolo, texto corto). ⚖️ = depende de los puntos de ese partido."""
     m = r["match"]
-    r2 = g._eval_match(m, {pm.order: [f]})
-    if not r2 or r2["pick"] != r["pick"] or r2["warn"]:
+    if kind(r) != "OFICIAL":
+        return "❌", "solo potencial"
+    r2 = safe_pick(g, m, r["pick"], {pm.order: [f]})
+    if not r2:
         sc = pts_scan(r, g, pm, f)
         if sc == "si":
             r2 = dict(r, warn=False)
         elif sc != "no":
             return "⚖️", sc
-        elif r2 and r2["pick"] == r["pick"]:
-            return "❌", "lo deciden los puntos"
         else:
-            return "❌", "no hay pick seguro"
-    if kind(r2) != "OFICIAL":
-        return "❌", "solo potencial"
+            r3 = g._eval_match(m, {pm.order: [f]})
+            return "❌", ("lo deciden los puntos" if r3 and r3["pick"] == r["pick"]
+                         else "no hay pick seguro")
     rs = rival_sets(g, r2["vs"]) + ((f[0] if pm.a == r2["vs"] else f[1])
                                      if r2["vs"] in (pm.a, pm.b) else 0)
-    star = rs <= 2
+    star = rs <= 2 and ESTRELLAS and not r2["warn"]
     if not star and is_night(m.time):
         return "❌", "oficial de noche sin ⭐"
     return "✅", ("⭐ " if star else "") + f"pick (cuota ≥ {CUOTA_ESTRELLA if star else CUOTA_NORMAL})"
@@ -767,15 +843,13 @@ def early_table(g, p0, p1, m, pick, vs):
     for f0 in p0.possible_finals():
         fila = []
         for f1 in p1.possible_finals():
-            r2 = g._eval_match(m, {p0.order: [f0], p1.order: [f1]})
-            if r2 and r2["pick"] == pick and kind(r2) == "OFICIAL":
+            r2 = safe_pick(g, m, pick, {p0.order: [f0], p1.order: [f1]})
+            if r2:
                 rs = rival_sets(g, vs)            # sets del rival al acabar esos dos
                 for pmx, fx in ((p0, f0), (p1, f1)):
                     if vs in (pmx.a, pmx.b):
                         rs += fx[0] if pmx.a == vs else fx[1]
-                if r2["warn"]:
-                    sym = "⚖️"
-                elif rs > 2 and is_night(m.time):
+                if (rs > 2 or r2["warn"] or not ESTRELLAS) and is_night(m.time):
                     sym = "❌"                    # de noche solo valen los ⭐
                 else:
                     sym = "✅"
@@ -983,7 +1057,7 @@ def tick():
     if TEST and time.time() - state["last_report"] >= REPORT_EVERY:
         state["last_report"] = time.time()
         live = [p for p in parsed if p["status"] == "inprogress"]
-        lines = [f"🧪 TT Cup: {len(parsed)} partidos hoy · {len(live)} en vivo · "
+        lines = [f"🧪 {LIGA}: {len(parsed)} partidos hoy · {len(live)} en vivo · "
                  f"{len(groups)} grupos"]
         for p in live[:5]:
             lines.append(f"  🔴 {p['a']} {p['score']} {p['b']}")
@@ -1049,6 +1123,12 @@ def tick():
         checked |= {m.mid for m in g.matches}
         results = g.analyze()
         track_b(g, results, sent)
+        # fuera los "picks" en los que ganar NO asegura el pase (dudas por puntos)
+        results = [r for r in results if not (r["warn"] and kind(r) == "OFICIAL" and
+                   not win_sure(g, r["match"], r["pick"],
+                                {pm.order: [f for f in pm.possible_finals()
+                                            if (f[0] > f[1]) == (w == pm.a)]
+                                 for pm, w in r["conds"]}))]
         for r in results:
             cands.add(f"{r['match'].mid}|{r['pick']}")
             if not r["conds"]:

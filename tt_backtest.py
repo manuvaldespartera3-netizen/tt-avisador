@@ -337,8 +337,8 @@ def run():
         if ms[0]["t"] < first_pick_ts:
             continue
         n_groups += 1
-        if any(x.get("dudoso") for x in ms):
-            dudosos += 1
+        if any(x.get("dudoso") for x in ms) or has_fifth(players, ms, parsed):
+            dudosos += 1           # datos dudosos o grupo de 5: no se usa
             continue
         for s in simulate(players, ms):
             r, j = s["r"], s["j"]
@@ -379,6 +379,28 @@ def run():
                       desde=(end - timedelta(days=DAYS - 1)), hasta=end, desempate=tb)
 
 
+_TS = {}
+
+
+def has_fifth(players, ms, by_t):
+    """¿Hay un 5.º jugador que se enfrenta a 3+ de estos 4 durante el grupo?
+    (Liga Pro tiene grupos de 5: entonces la tabla de 4 no vale.)"""
+    t0, t1 = ms[0]["t"], ms[-1]["t"]
+    riv = defaultdict(set)
+    key = id(by_t)
+    if key not in _TS:
+        _TS.clear()
+        _TS[key] = [x["t"] for x in by_t]
+    lo = bisect.bisect_left(_TS[key], t0)
+    for x in by_t[lo:]:
+        if x["t"] > t1:
+            break
+        for p_, q_ in ((x["a"], x["b"]), (x["b"], x["a"])):
+            if p_ in players and q_ not in players:
+                riv[q_].add(p_)
+    return any(len(v) >= 3 for v in riv.values())
+
+
 # ------------------------------------------------- comprobar el desempate real
 def tiebreak_check(parsed, groups):
     """Mira en los grupos REALES con empate a puntos en la frontera 2.º/3.º quién
@@ -390,7 +412,11 @@ def tiebreak_check(parsed, groups):
     by_t = sorted(parsed, key=lambda x: x["t"])
     stats = {"casos": 0, "ittf": 0, "total": 0, "distintas": 0,
              "dist_ittf": 0, "dist_total": 0, "ejemplos": []}
+    stats["grupos5"] = 0
     for players, ms in groups:
+        if has_fifth(players, ms, by_t):
+            stats["grupos5"] += 1
+            continue
         pts = {p: 0 for p in players}
         sw = {p: 0 for p in players}
         sl = {p: 0 for p in players}
@@ -421,6 +447,8 @@ def tiebreak_check(parsed, groups):
                 pares.append(pr)
             if len(pares) == 2:
                 break
+        if len(pares) == 1:
+            pares.append(frozenset(players) - pares[0])     # el otro par: los otros dos
         if len(pares) != 2:
             continue
         s0, s1 = (sum(pts[p] for p in q) for q in pares)
@@ -459,31 +487,38 @@ def tiebreak_check(parsed, groups):
                 stats["ejemplos"].append(
                     f"   {d} · {' · '.join(f'{p} {pts[p]}' for p in orden)} → "
                     f"final real: {' y '.join(sorted(real))} · "
-                    f"ITTF dice {' y '.join(sorted(top))} {'✅' if ok_ittf else '❌'} · "
+                    f"BOT dice {' y '.join(sorted(top))} {'✅' if ok_ittf else '❌'} · "
                     f"TOTAL dice {' y '.join(sorted(tt[:2]))} {'✅' if ok_total else '❌'}")
     return stats
 
 
 def tiebreak_lines(st):
+    import tt_engine
+    if tt_engine.TIEBREAK == "ligapro":
+        regla = "BOT = reglamento Liga Pro: sets ganados, dif. sets, dif. puntos, puntos (todo el grupo)"
+    else:
+        regla = "BOT = ITTF: solo cuentan los partidos ENTRE los empatados"
     L = ["=" * 60, "⚖️ ¿QUÉ DESEMPATE USA DE VERDAD LA LIGA?", "=" * 60,
-         "• ITTF = solo cuentan los partidos ENTRE los empatados (lo que usa el bot)",
-         "• TOTAL = cuentan los sets de TODO el grupo",
+         "• " + regla,
+         "• TOTAL = cociente de sets de TODO el grupo (alternativa)",
          "• Se mira quién jugó de verdad la final (los 2 primeros) en los grupos",
          "  con empate a puntos entre el 2.º y el 3.º."]
     if not st["casos"]:
         L.append("   Sin casos suficientes.")
         return L
     L.append(f"   Grupos con empate comprobados: {st['casos']}")
-    L.append(f"   Acierta ITTF: {st['ittf']} de {st['casos']} · Acierta TOTAL: {st['total']} de {st['casos']}")
+    if st.get("grupos5"):
+        L.append(f"   Grupos que parecen de 5 jugadores (no se usan): {st['grupos5']}")
+    L.append(f"   Acierta la regla del BOT: {st['ittf']} de {st['casos']} · Acierta TOTAL: {st['total']} de {st['casos']}")
     L.append(f"   Casos donde las dos reglas dan distinto: {st['distintas']}")
     if st["distintas"]:
-        L.append(f"   → en esos acierta ITTF {st['dist_ittf']} y TOTAL {st['dist_total']}")
+        L.append(f"   → en esos acierta el BOT {st['dist_ittf']} y TOTAL {st['dist_total']}")
         L.extend(st["ejemplos"])
     if st["distintas"] >= 3:
         if st["dist_ittf"] > st["dist_total"]:
-            L.append("   ✅ CONCLUSIÓN: la liga usa la regla ITTF (la del bot).")
+            L.append("   ✅ CONCLUSIÓN: la liga usa la misma regla que el bot.")
         elif st["dist_total"] > st["dist_ittf"]:
-            L.append("   ❗ CONCLUSIÓN: la liga usa los SETS DE TODO EL GRUPO. Hay que cambiar el bot.")
+            L.append("   ❗ CONCLUSIÓN: la regla del bot NO coincide con la liga. Hay que cambiarla.")
     return L
 
 
@@ -745,9 +780,10 @@ def telegram_summary(rows, info):
         L.extend(hc_compare([r for r in rows if r["tipo"] == "OFICIAL"]))
     tb = info.get("desempate") or {"casos": 0}
     if tb.get("casos"):
-        L.append(f"⚖️ Desempate real: {tb['casos']} grupos · acierta ITTF {tb['ittf']} · "
+        L.append(f"⚖️ Desempate real: {tb['casos']} grupos · acierta el BOT {tb['ittf']} · "
                  f"acierta TOTAL {tb['total']} · donde difieren ({tb['distintas']}): "
-                 f"ITTF {tb['dist_ittf']} / TOTAL {tb['dist_total']}")
+                 f"BOT {tb['dist_ittf']} / TOTAL {tb['dist_total']}"
+                 + (f" · grupos de 5: {tb.get('grupos5', 0)}" if tb.get("grupos5") else ""))
     L.append("Informe completo y lista de picks en los archivos 👇")
     return "\n".join(L)
 

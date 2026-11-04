@@ -255,5 +255,15 @@ def build_groups(events):
             mm.done_pts = x.get("done_pts")      # puntos de sets terminados (en juego)
         grp = Group(list(four), matches)
         grp.dudoso = any(x.get("dudoso") for x in ms)
+        # ¿grupo de 5? (Liga Pro los tiene): un 5.º jugador que se enfrenta en este
+        # mismo tramo a 3 o mas de los 4. Entonces la tabla de 4 seria falsa.
+        rivales = {}
+        for x in pool:
+            for p_, q_ in ((x["a"], x["b"]), (x["b"], x["a"])):
+                if p_ in four and q_ not in four:
+                    rivales.setdefault(q_, set()).add(p_)
+        grp.quinto = next((q_ for q_, v in rivales.items() if len(v) >= 3), None)
+        if grp.quinto:
+            grp.dudoso = True
         groups.append(grp)
     return groups, parsed
