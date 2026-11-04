@@ -1,9 +1,13 @@
 name: Liga Pro seguimiento
 
-# Totalmente aparte del avisador de TT Cup:
-#  - sus propios archivos (lp_*.py), su propia memoria y su propio grupo
-#  - guarda sus datos en la rama "ligapro-datos" (nunca toca main ni picks.csv)
-#  - no lee tus mensajes de Telegram; avisa de picks marcados 'no apostar'
+# Avisador de Czech Liga Pro: el MISMO programa que TT Cup (tt_alerts.py), con
+# las reglas de Liga Pro. Totalmente aparte del avisador de TT Cup:
+#  - su propia memoria (state_ligapro.json) y su propio grupo de ejecuciones
+#  - guarda sus picks en la rama "ligapro-datos" (nunca toca main ni picks.csv)
+#  - si existe el secreto TELEGRAM_TOKEN_LP, usa SU PROPIO bot de Telegram (y
+#    entonces lee tus cuotas, /pick, /ver, /resumen). Si no existe, escribe en el
+#    bot de TT Cup con la etiqueta "🇨🇿 LIGA PRO" y NO lee tus mensajes (para no
+#    quitárselos al bot de TT Cup).
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -22,6 +26,8 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: actions/setup-python@v5
         with:
@@ -40,22 +46,27 @@ jobs:
           git clone -q --depth 1 --branch ligapro-datos "$URL" datos 2>/dev/null || {
             mkdir -p datos && cd datos && git init -q && git checkout -q -b ligapro-datos && git remote add origin "$URL"; }
 
-      - name: Seguir Liga Pro
+      - name: Avisador Liga Pro
         env:
           ZYLA_API_KEY: ${{ secrets.ZYLA_API_KEY }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_LP || secrets.TELEGRAM_TOKEN }}
           MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
+          LEER_MENSAJES: ${{ secrets.TELEGRAM_TOKEN_LP && '1' || '0' }}
+          LIGA_TAG: ${{ !secrets.TELEGRAM_TOKEN_LP && '🇨🇿 LIGA PRO' || '' }}
+          LIGA_NOMBRE: "Liga Pro"
           TEST_MODE: "0"
-          SEGUIMIENTO: "1"
           TT_TOURNAMENT_ID: "19039"
           TT_TIEBREAK: "ligapro"
+          ESTRELLAS: "0"
+          FILTRO_NOCHE: "0"
+          CUOTA_NORMAL: "1.60"
+          CUOTA_ESTRELLA: "1.60"
           STATE_FILE: state_ligapro.json
           PICKS_FILE: datos/picks_ligapro.csv
           POLL_SECONDS: "60"
           POLL_FAST: "15"
           RUN_SECONDS: "290"
-          CUOTA_NORMAL: "1.60"
-        run: python lp_alerts.py
+        run: python tt_alerts.py
 
       - name: Guardar memoria Liga Pro
         if: always()
@@ -72,7 +83,7 @@ jobs:
             git config user.name "tt-avisador"
             git config user.email "tt-avisador@users.noreply.github.com"
             git add picks_ligapro.csv
-            git commit -qm "Liga Pro seguimiento"
+            git commit -qm "Liga Pro picks"
             for i in 1 2 3; do
               git pull -q --rebase origin ligapro-datos 2>/dev/null || true
               git push -q origin ligapro-datos && break
