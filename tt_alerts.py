@@ -760,6 +760,61 @@ def full_heads_up_text(r, pm, g):
     return "\n".join(lines)
 
 
+def early_table(g, p0, p1, m, pick, vs):
+    """Para cada resultado EXACTO de p0 y de p1: ¿pick OFICIAL apostable?
+    Devuelve {f0: [(f1, simbolo)]} o None si no merece aviso."""
+    tab = {}
+    for f0 in p0.possible_finals():
+        fila = []
+        for f1 in p1.possible_finals():
+            r2 = g._eval_match(m, {p0.order: [f0], p1.order: [f1]})
+            if r2 and r2["pick"] == pick and kind(r2) == "OFICIAL":
+                rs = rival_sets(g, vs)            # sets del rival al acabar esos dos
+                for pmx, fx in ((p0, f0), (p1, f1)):
+                    if vs in (pmx.a, pmx.b):
+                        rs += fx[0] if pmx.a == vs else fx[1]
+                if r2["warn"]:
+                    sym = "⚖️"
+                elif rs > 2 and is_night(m.time):
+                    sym = "❌"                    # de noche solo valen los ⭐
+                else:
+                    sym = "✅"
+            else:
+                # ¿no hay pick seguro solo porque lo deciden los puntos? -> ⚖️
+                sts = [st for _, st in g.completions({p0.order: [f0], p1.order: [f1]})]
+                dudoso = any(st.get(pick) == "A" or st.get(vs) == "A" for st in sts)
+                rival_fuera = all(st.get(vs) in ("O", "A") for st in sts)
+                sym = "⚖️" if dudoso and rival_fuera else "❌"
+            fila.append((f1, sym))
+        tab[f0] = fila
+    # se avisa si con algun resultado del 1.er partido hay pick en la mitad o mas
+    # de los resultados del 2.º (si no, seria ruido)
+    ok = any(sum(x == "✅" for _, x in fila) * 2 >= len(fila) for fila in tab.values())
+    return tab if ok else None
+
+
+def early_text(tab, m, pick, vs, p0, p1):
+    def nom(p):
+        return p.split()[0]
+    lines = [f"🗓 PICK PROBABLE (con tiempo): {pick.upper()} vs {vs} · {m.time}",
+             f"Faltan 2 partidos: 1.º {p0.a} – {p0.b}"
+             + (f" (va {p0.live[0]}-{p0.live[1]})" if p0.live else f" ({p0.time})")
+             + f" · 2.º {p1.a} – {p1.b} ({p1.time})"]
+    for f0, fila in tab.items():
+        w0 = p0.a if f0[0] > f0[1] else p0.b
+        head = f"{nom(w0)} {max(f0)}-{min(f0)}"
+        syms = {x for _, x in fila}
+        if syms == {"✅"}:
+            lines.append(f"• {head} → ✅ pick pase lo que pase en el 2.º")
+        elif syms == {"❌"}:
+            lines.append(f"• {head} → ❌ no")
+        else:
+            lines.append(f"• {head} → " + " ".join(
+                f"{nom(p1.a if f[0] > f[1] else p1.b)}{max(f)}-{min(f)}{x}" for f, x in fila))
+    lines.append("Aún NO apuestes: te voy concretando según acaben.")
+    return "\n".join(lines)
+
+
 def preview_text(r, pm, g):
     """PREAVISO: posible pick y que tiene que pasar en el partido del que depende."""
     m = r["match"]
@@ -1050,6 +1105,22 @@ def tick():
                 rx = dict(match=m, pick=pick, vs=vs, reason=f"{vs} ya eliminado",
                           warn=False, conds=[(pm, "")])
                 cond_alert(rx, m, pm, g)
+        # AVISO TEMPRANO: aun faltan 2 partidos antes del del pick. Se avisa ya
+        # si en la mayoria de casos va a haber pick, para que lo tengas con tiempo.
+        if len(pend) == 3 and pend[1].live is None and pend[2].live is None:
+            p0, p1, m = pend
+            if p0.live is not None:
+                HOT["on"] = True              # en cuanto acabe, se recalcula al momento
+                HOT["ids"].add(p0.mid)
+                HOT["last"] = time.time()
+            for pick, vs in ((m.a, m.b), (m.b, m.a)):
+                key = f"E|{m.mid}|{pick}"
+                if key in sent:
+                    continue
+                tab = early_table(g, p0, p1, m, pick, vs)
+                if tab:
+                    once(key, lambda tab=tab, m=m, pick=pick, vs=vs, p0=p0, p1=p1:
+                         early_text(tab, m, pick, vs, p0, p1))
 
     # si se avisó "ATENTO" y ese pick ya no es posible, decirlo claro
     pstat = {p["id"]: p for p in parsed}
