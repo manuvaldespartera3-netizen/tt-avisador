@@ -11,27 +11,27 @@
     {
      "name": "1",
      "initialValue": {
-      "fractional": "1/4",
-      "decimal": 1.25,
-      "american": "-400"
+      "fractional": "2/7",
+      "decimal": 1.29,
+      "american": "-350"
      },
      "value": {
-      "fractional": "1/4",
-      "decimal": 1.25,
-      "american": "-400"
+      "fractional": "2/7",
+      "decimal": 1.29,
+      "american": "-350"
      }
     },
     {
      "name": "2",
      "initialValue": {
-      "fractional": "11/4",
-      "decimal": 3.75,
-      "american": "+275"
+      "fractional": "5/2",
+      "decimal": 3.5,
+      "american": "+250"
      },
      "value": {
-      "fractional": "11/4",
-      "decimal": 3.75,
-      "american": "+275"
+      "fractional": "5/2",
+      "decimal": 3.5,
+      "american": "+250"
      }
     }
    ]
