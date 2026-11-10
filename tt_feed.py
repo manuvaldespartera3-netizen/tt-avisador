@@ -258,7 +258,10 @@ def build_groups(events):
         # ¿grupo de 5? (Liga Pro los tiene): un 5.º jugador que se enfrenta en este
         # mismo tramo a 3 o mas de los 4. Entonces la tabla de 4 seria falsa.
         rivales = {}
+        t_ini, t_fin = ms[0]["t"], ms[-1]["t"]      # SOLO mientras dura este grupo
         for x in pool:
+            if not (t_ini <= x["t"] <= t_fin):
+                continue                           # el torneo siguiente no cuenta
             for p_, q_ in ((x["a"], x["b"]), (x["b"], x["a"])):
                 if p_ in four and q_ not in four:
                     rivales.setdefault(q_, set()).add(p_)

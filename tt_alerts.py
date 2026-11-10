@@ -19,6 +19,7 @@ from datetime import datetime
 import sys
 import time
 import traceback
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -107,13 +108,36 @@ def send(text, reply_to=None):
     params = {"chat_id": CHAT, "text": text[:4000]}
     if reply_to:
         params["reply_to_message_id"] = reply_to
-    data = urllib.parse.urlencode(params).encode()
-    try:
-        with urllib.request.urlopen(f"https://api.telegram.org/bot{TG}/sendMessage",
-                                    data, timeout=15) as resp:
-            return json.loads(resp.read().decode()).get("result", {}).get("message_id")
-    except Exception as ex:
-        print("WARN telegram", ex)
+    # Un pick NO se puede perder por un fallo puntual de Telegram: se reintenta
+    # hasta 5 veces (y si Telegram pide esperar, se espera lo que diga).
+    for intento in range(5):
+        data = urllib.parse.urlencode(params).encode()
+        try:
+            with urllib.request.urlopen(f"https://api.telegram.org/bot{TG}/sendMessage",
+                                        data, timeout=15) as resp:
+                return json.loads(resp.read().decode()).get("result", {}).get("message_id")
+        except urllib.error.HTTPError as ex:
+            body = ""
+            try:
+                body = ex.read().decode()
+            except Exception:
+                pass
+            print("WARN telegram", ex.code, body[:200])
+            if ex.code == 429:                      # demasiados mensajes seguidos
+                try:
+                    espera = int(json.loads(body)["parameters"]["retry_after"])
+                except Exception:
+                    espera = 5
+                time.sleep(min(espera, 30) + 1)
+                continue
+            if ex.code == 400 and "reply_to_message_id" in params:
+                params.pop("reply_to_message_id")   # el mensaje citado ya no existe
+                continue
+            if ex.code < 500:
+                return None                         # error que no se arregla reintentando
+        except Exception as ex:
+            print("WARN telegram", ex)
+        time.sleep(2 * (intento + 1))
     return None
 
 
@@ -283,6 +307,27 @@ def delete_manual(text, reply_to):
     return True
 
 
+def grupos_text(parsed, groups):
+    """'/grupos' -> los grupos que el bot ve ahora mismo y en que estado."""
+    now = time.time()
+    vivos = [g for g in groups if g.pending()]
+    L = [f"🔎 {LIGA}: {len(parsed)} partidos hoy en los datos · {len(groups)} grupos "
+         f"formados · {len(vivos)} sin terminar"]
+    for g in sorted(vivos, key=lambda g: g.matches[0].time)[:15]:
+        jug = sum(1 for x in g.matches if x.final)
+        vivo = next((x for x in g.matches if x.live is not None), None)
+        flag = (f" ⚠️ grupo de 5 (con {g.quinto})" if getattr(g, "quinto", None)
+                else " ⚠️ datos dudosos" if getattr(g, "dudoso", False) else "")
+        estado = f"jugando {vivo.a.split()[0]}–{vivo.b.split()[0]}" if vivo else "esperando"
+        L.append(f"• {g.matches[0].time} {' · '.join(p.split()[0] for p in g.players)}: "
+                 f"{jug}/6 jugados, {estado}{flag}")
+    sueltos = [p for p in parsed if p["t"] > now - 3 * 3600 and
+               not any(p["id"] in {x.mid for x in g.matches} for g in groups)]
+    if sueltos:
+        L.append(f"Partidos de las últimas 3 h que NO encajan en ningún grupo: {len(sueltos)}")
+    return "\n".join(L)[:3900]
+
+
 def ver_text(name, parsed, groups):
     """'/ver Apellido' -> lo que el bot esta viendo AHORA del grupo de ese jugador."""
     name = name.strip().lower()
@@ -359,6 +404,9 @@ def read_replies(parsed=(), groups=()):
         if text.startswith("/resumen"):
             send(summary_text(datetime.now(tt_feed.TZ).strftime("%Y-%m-%d")))
             continue
+        if text.startswith("/grupos"):
+            send(grupos_text(parsed, groups), msg.get("message_id"))
+            continue
         if text.startswith("/ver"):
             send(ver_text(" ".join(text.split()[1:]), parsed, groups), msg.get("message_id"))
             continue
@@ -430,7 +478,8 @@ def startup_report():
              "✍️ Responde a cada pick con tu cuota (ej. 1.45) · /resumen = resumen al momento",
              "✍️ /pick Apellido Rival 1.88 = registrar a mano un pick que apostaste",
              "🗑 /borrar Apellido Rival = quitar un pick puesto a mano",
-             "🔎 /ver Apellido = lo que el bot ve ahora del grupo de ese jugador"]
+             "🔎 /ver Apellido = lo que el bot ve ahora del grupo de ese jugador",
+             "🔎 /grupos = todos los grupos que el bot está siguiendo ahora"]
     try:
         events, live = fetch()
         groups, parsed = build_groups(events)
