@@ -1,69 +1,11 @@
-🔎 DIAGNÓSTICO DE DATOS (Zyla/Sofascore)
+🔎 DIAGNÓSTICO BETSAPI
 
-1) Partidos por liga (número de torneo actual):
-   TT Cup (15005): 362 / 348 / 251  [antes de ayer / ayer / hoy]
-      torneos: TT Cup ×961
-   Czech Liga Pro (19039): 291 / 111 / 1  [antes de ayer / ayer / hoy]
-      torneos: Czech Liga Pro ×403
-   TT Elite Series (19041): 500 / 195 / 0  [antes de ayer / ayer / hoy]
-      torneos: TT Elite Series ×695
-   Setka Cup (15004): 796 / 799 / 611  [antes de ayer / ayer / hoy]
-      torneos: Setka Cup ×2206
+1) sport_id=92: HTTP Error 401: Unauthorized
+1) sport_id=91: HTTP Error 401: Unauthorized
+1) sport_id=90: HTTP Error 401: Unauthorized
+   (no he podido confirmar el deporte por los nombres; uso 92)
+   → tenis de mesa = sport_id 92
 
-2) ¿En qué torneo salen ahora jugadores de Liga Pro?
-   Brozhik: 20 partidos recientes
-   Saleny: 20 partidos recientes
-   Zahradnik: 20 partidos recientes
-   Dolezal: 20 partidos recientes
-   Heczko: 20 partidos recientes
-   Machander: 20 partidos recientes
-   Volf: 20 partidos recientes
-   Torneos donde aparecen (número · nombre · país):
-   ▶ ? · Czech Liga Pro · Czech Republic ×79   p. ej. Tuma, Daniel – Brozhik, Karel 
-   ▶ ? · TT Cup · Czech Republic ×38   p. ej. Fiklik, Ondrej – Saleny, David 
-   ▶ ? · Bundesliga · Germany ×19   p. ej. VfL Wolfsburg – FC Bayern München 
-   ▶ ? · Liga Pro · Russia ×2   p. ej. Brozhik, Karel – Sulc, Martin 
-   ▶ ? · FNC 27 · World ×1   p. ej. Leon Gavanas – Sven Dolezal 
-   ▶ ? · DFB Pokal · Germany ×1   p. ej. VfL Wolfsburg – Borussia Dortmund 
-
-3) Torneos que se llaman 'Liga Pro':
-   (sin resultados)
-
-4) Torneos de tenis de mesa programados HOY (número · nombre):
-   ▶ 171028 · Liga Pro
-   ▶ 31462 · Liga Pro
-   ▶ 99075 · Czech Liga Pro
-   ▶ 19039 · Czech Liga Pro
-   ▶ 78888 · TT Cup
-   ▶ 15005 · TT Cup
-   ▶ 78895 · Liga Pro
-   ▶ 15006 · Liga Pro
-   ▶ 78914 · Setka Cup
-   ▶ 15004 · Setka Cup
-
-5) Búsqueda de torneos 'Liga Pro':
-   ▶ 155 · Liga Profesional de Fútbol ·  · 
-   ▶ 13475 · Copa de la Liga Profesional ·  · 
-   ▶ 18436 · Trofeo de Campeones de la Liga Profesional ·  · 
-   ▶ 15006 · Liga Pro ·  · 
-   ▶ 19039 · Czech Liga Pro ·  · 
-   ▶ 14756 · Liga Pro FIFA20 - 12 mins play ·  · 
-   ▶ 22819 · A.F. Porto Decathlon Liga Pro ·  · 
-   ▶ 16353 · Liga Pro FIFA21 - 12 mins play ·  · 
-   ▶ 31462 · Liga Pro ·  · 
-   ▶ 14770 · Liga Pro ·  · 
-
-6) TODOS los partidos de tenis de mesa de HOY, por torneo:
-   error (HTTP Error 400: Bad Request)
-
-7) Pruebas de otras vías para leer Liga Pro hoy:
-   por fecha sport_slug=table-tennis: HTTP Error 400: Bad Request
-   por fecha sport_slug=table_tennis: HTTP Error 400: Bad Request
-   por fecha sport_slug=tabletennis: HTTP Error 400: Bad Request
-   por fecha date=today: HTTP Error 400: Bad Request
-   en vivo (table-tennis): OK · 15 partidos · de Liga Pro 4
-   torneo 99075 por fecha: OK · 0 partidos · de Liga Pro 0
-   temporadas de 19039: OK · 0 partidos · de Liga Pro 0
-      temporadas: 96742 (2026), 107012 (2026)
-   rondas temporada actual: OK · 0 partidos · de Liga Pro 0
-   jugador Brozhik: id None
+2) terminados de hoy: HTTP Error 401: Unauthorized
+2) próximos de hoy: HTTP Error 401: Unauthorized
+2) Ligas de tenis de mesa HOY (número · nombre: terminados / en juego / próximos):
