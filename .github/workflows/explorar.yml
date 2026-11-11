@@ -20,6 +20,7 @@ jobs:
       - name: Explorar formato de las ligas
         env:
           ZYLA_API_KEY: ${{ secrets.ZYLA_API_KEY }}
+          BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
         run: python tt_explorar.py
