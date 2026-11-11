@@ -109,6 +109,131 @@ def _todos_del_dia(d):
     return [e for e in _events(data) if _es_del_torneo(e)]
 
 
+# ---------------------------------------------------------------------------
+# RESPALDO "EN VIVO": si la consulta por torneo no da partidos (le pasa a Liga
+# Pro desde el 10/11), se leen los partidos EN JUEGO de tenis de mesa cada vuelta
+# y se van guardando. Cuando uno deja de estar en juego se pide su resultado.
+# Con los partidos ya vistos se deducen los grupos y se crean los partidos que
+# faltan por jugar (mismos 4 jugadores) con hora estimada, para poder avisar.
+# ---------------------------------------------------------------------------
+URL_LIVE = os.getenv(
+    "ZYLA_URL_LIVE",
+    "https://zylalabs.com/api/12787/sofascore+-+live+api/25092/get+live+matches")
+ACUM = {}         # lo rellena el avisador con su memoria: {"ev": {...}, "sint": {...}}
+SLOT = 30 * 60    # tiempo entre partidos de un grupo (para estimar la hora)
+
+
+def _slim(e):
+    t = e.get("tournament") or {}
+    ut = t.get("uniqueTournament") or {}
+    keep = {k: e.get(k) for k in ("id", "status", "homeScore", "awayScore",
+                                   "startTimestamp", "winnerCode")}
+    keep["homeTeam"] = {"name": (e.get("homeTeam") or {}).get("name")}
+    keep["awayTeam"] = {"name": (e.get("awayTeam") or {}).get("name")}
+    keep["tournament"] = {"name": t.get("name"),
+                          "uniqueTournament": {"id": ut.get("id"), "name": ut.get("name")}}
+    return keep
+
+
+def _pair(e):
+    return tuple(sorted(((e.get("homeTeam") or {}).get("name") or "",
+                         (e.get("awayTeam") or {}).get("name") or "")))
+
+
+def _sint_id(d, pair):
+    import hashlib
+    return "s" + hashlib.md5(f"{d}|{pair[0]}|{pair[1]}".encode()).hexdigest()[:11]
+
+
+def _respaldo_vivo(days):
+    evs = ACUM.setdefault("ev", {})
+    sint = ACUM.setdefault("sint", {})          # id sintetico -> [jugador, jugador, hora]
+    data = _call(URL_LIVE, sport_slug="table-tennis")
+    vivos = {str(e.get("id")): e for e in _events(data) if _es_del_torneo(e)}
+    for k, e in vivos.items():
+        evs[k] = _slim(e)
+    # los que estaban en juego y ya no aparecen: han terminado -> pedir el resultado
+    pend = [k for k, e in evs.items() if (e.get("status") or {}).get("type") == "inprogress"
+            and k not in vivos]
+    for k in pend[:10]:
+        try:
+            ev = _find_event(_call(URL_EVENT, match_id=k))
+            if ev:
+                evs[k] = _slim(ev)
+        except Exception as ex:
+            print("WARN resultado", k, ex)
+    # limpiar lo de hace mas de 30 h
+    limite = time.time() - 30 * 3600
+    for k in [k for k, e in evs.items() if (e.get("startTimestamp") or 0) < limite]:
+        evs.pop(k)
+    for k in [k for k, v in sint.items() if v[2] < limite]:
+        sint.pop(k)
+    reales = list(evs.values())
+    por_par = {}
+    for e in sorted(reales, key=lambda e: e.get("startTimestamp") or 0):
+        por_par.setdefault(_pair(e), []).append(e)
+    # el partido real que llega para un par ya "inventado" se queda con el id inventado
+    out = []
+    ocupados = set()
+    for sid, (a, b, t) in sint.items():
+        cand = [e for e in por_par.get(tuple(sorted((a, b))), [])
+                if abs((e.get("startTimestamp") or 0) - t) <= 2 * 3600]
+        if cand:
+            e = dict(cand[0])
+            ALIAS[sid] = str(e["id"])
+            e["id"] = sid
+            ocupados.add(str(cand[0]["id"]))
+            out.append(e)
+    out += [e for e in reales if str(e["id"]) not in ocupados]
+    # deducir grupos de 4 con al menos 3 partidos vistos y crear los que faltan
+    vistos = sorted(out, key=lambda e: e.get("startTimestamp") or 0)
+    hechos = set()
+    for i, m1 in enumerate(vistos):
+        A, B = _pair(m1)
+        t1 = m1.get("startTimestamp") or 0
+        for m2 in vistos[i + 1:]:
+            t2 = m2.get("startTimestamp") or 0
+            if t2 - t1 > 3600:
+                break
+            C, D = _pair(m2)
+            four = frozenset((A, B, C, D))
+            if len(four) != 4 or four in hechos:
+                continue
+            en_tramo = [e for e in vistos if set(_pair(e)) <= four
+                        and t1 - 600 <= (e.get("startTimestamp") or 0) <= t1 + 3.5 * 3600]
+            pares = {}
+            for e in en_tramo:
+                pares.setdefault(_pair(e), e)
+            if len(pares) < 3:
+                continue
+            hechos.add(four)
+            ult = max(e.get("startTimestamp") or 0 for e in pares.values())
+            jug = sorted(four)
+            # orden habitual: en cada ronda juega antes el que abrió el grupo
+            primero = min(pares.values(), key=lambda e: e.get("startTimestamp") or 0)
+            abre = (primero.get("homeTeam") or {}).get("name")
+            faltan = [(jug[x], jug[y]) for x in range(4) for y in range(x + 1, 4)
+                      if (jug[x], jug[y]) not in pares]
+            faltan.sort(key=lambda pr: 0 if abre in pr else 1)
+            for k, pr in enumerate(faltan, 1):
+                    d = datetime.fromtimestamp(t1, TZ).strftime("%Y-%m-%d")
+                    sid = _sint_id(d, pr)
+                    if sid not in sint:
+                        sint[sid] = [pr[0], pr[1], ult + k * SLOT]
+                    if not any(e.get("id") == sid for e in out):
+                        out.append({"id": sid, "status": {"type": "notstarted"},
+                                    "homeTeam": {"name": pr[0]}, "awayTeam": {"name": pr[1]},
+                                    "homeScore": {}, "awayScore": {},
+                                    "startTimestamp": sint[sid][2],
+                                    "tournament": {"name": TORNEO_NOMBRE}})
+    ds = set(days)
+    return [e for e in out
+            if datetime.fromtimestamp(e.get("startTimestamp") or 0, TZ).strftime("%Y-%m-%d") in ds]
+
+
+ALIAS = {}        # id inventado -> id real (cuando el partido ya ha aparecido)
+
+
 def fetch():
     """Partidos de la liga de hoy (y de ayer si es de madrugada)."""
     now = datetime.now(TZ)
@@ -116,28 +241,31 @@ def fetch():
     if now.hour < 4:
         days.insert(0, (now - timedelta(days=1)).strftime("%Y-%m-%d"))
     evs = {}
+    pocos = False
     for d in days:
-        if FUENTE.get(d) == "respaldo":
-            # ya se vio que hoy la consulta por torneo no sirve: directos al respaldo
-            try:
-                lista = _todos_del_dia(d)
-            except Exception as ex:
-                print("WARN respaldo por fecha", ex)
-                lista = _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d))
-        else:
-            lista = _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d))
-            if len(lista) < MIN_POR_TORNEO and (now.hour >= 6 or d != days[-1]):
-                try:
-                    otra = _todos_del_dia(d)
-                    if len(otra) > len(lista):
-                        lista = otra
-                        FUENTE[d] = "respaldo"
-                except Exception as ex:
-                    print("WARN respaldo por fecha", ex)
-        FUENTE["modo"] = ("todos los partidos del día, filtrados (respaldo)"
-                          if FUENTE.get(d) == "respaldo" else "consulta por torneo")
+        lista = _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d))
+        if len(lista) < MIN_POR_TORNEO and (now.hour >= 6 or d != days[-1]):
+            pocos = True
         for e in lista:
-            evs[e.get("id")] = e
+            evs[str(e.get("id"))] = e
+    FUENTE["modo"] = "consulta por torneo"
+    if pocos:
+        # la consulta normal casi no da partidos: respaldo con los partidos en juego
+        try:
+            extra = _respaldo_vivo(days)
+            FUENTE["modo"] = (f"partidos en juego, acumulados (respaldo): "
+                              f"{len(ACUM.get('ev', {}))} vistos")
+            pares_lista = {_pair(e) for e in evs.values()}
+            reales_ids = {str(k) for k in evs}
+            for e in extra:
+                k = str(e.get("id"))
+                if k in evs or ALIAS.get(k) in reales_ids:
+                    continue
+                if k.startswith("s") and k not in ALIAS and _pair(e) in pares_lista:
+                    continue          # ese partido ya viene en la consulta normal
+                evs[k] = e
+        except Exception as ex:
+            print("WARN respaldo en vivo", ex)
     live = sum(1 for e in evs.values() if (e.get("status") or {}).get("type") == "inprogress")
     return list(evs.values()), live
 
@@ -162,8 +290,14 @@ def event(event_id):
     """Datos frescos de un partido, o None si no se pueden leer."""
     if not URL_EVENT or "EVENT_ID" in URL_EVENT:
         return None
+    real = ALIAS.get(str(event_id), str(event_id))
+    if real.startswith("s"):
+        return None                 # partido aun no visto (solo deducido)
     try:
-        return _find_event(_call(URL_EVENT, match_id=event_id))
+        ev = _find_event(_call(URL_EVENT, match_id=real))
+        if ev and real != str(event_id):
+            ev = dict(ev, id=event_id)
+        return ev
     except Exception as ex:
         print("WARN event", event_id, ex)
         return None
@@ -174,7 +308,10 @@ def h2h(event_id):
     if not URL_H2H:
         return None
     try:
-        d = _call(URL_H2H, **{H2H_PARAM: event_id})
+        real = ALIAS.get(str(event_id), str(event_id))
+        if real.startswith("s"):
+            return None
+        d = _call(URL_H2H, **{H2H_PARAM: real})
 
         def find(o):
             if isinstance(o, dict):
@@ -292,7 +429,8 @@ def build_groups(events):
         used |= {x["id"] for x in ms}
         ms.sort(key=lambda x: x["t"])
         matches = [Match(x["a"], x["b"], i + 1,
-                         time=datetime.fromtimestamp(x["t"], TZ).strftime("%H:%M"),
+                         time=datetime.fromtimestamp(x["t"], TZ).strftime("%H:%M")
+                         + ("≈" if str(x["id"]).startswith("s") else ""),   # hora estimada
                          final=x["final"], live=x["live"], points=x["points"], mid=x["id"],
                          live_pts=x.get("live_pts", 0))
                    for i, x in enumerate(ms)]

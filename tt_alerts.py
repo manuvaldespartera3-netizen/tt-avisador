@@ -146,6 +146,9 @@ def odds_now(mid, pick_home):
     """Cuota del pick ahora mismo segun Sofascore (o '' si no hay)."""
     if not tt_feed.KEY:
         return ""
+    mid = tt_feed.ALIAS.get(str(mid), str(mid))
+    if mid.startswith("s"):
+        return ""                      # partido deducido, aun sin id real
     try:
         data = tt_feed._call(URL_ODDS, match_id=mid)
     except Exception as ex:
@@ -1105,6 +1108,7 @@ def track_b(g, results, sent):
 def tick():
     HOT["on"] = False
     HOT["ids"] = set()
+    tt_feed.ACUM = state.setdefault("acum_vivo", {})   # respaldo en vivo (Liga Pro)
     events, live_total = fetch()
     if FRESH:
         # lo leido partido a partido es mas reciente que la lista del torneo
