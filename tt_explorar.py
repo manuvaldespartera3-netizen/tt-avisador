@@ -166,6 +166,51 @@ def main():
     except Exception as ex:
         L.append(f"   error ({str(ex)[:80]})")
 
+    L.append("")
+    L.append("7) Pruebas de otras vías para leer Liga Pro hoy:")
+    hoy_s = dias[-1]
+
+    def prueba(nombre, url, **kw):
+        try:
+            data = _call(url, **kw)
+            evs = [e for e in walk(data) if "homeTeam" in e and "awayTeam" in e]
+            lp = [e for e in evs if "liga pro" in str((e.get("tournament") or {}).get("name", "")).lower()]
+            L.append(f"   {nombre}: OK · {len(evs)} partidos · de Liga Pro {len(lp)}")
+            return data
+        except Exception as ex:
+            L.append(f"   {nombre}: {str(ex)[:70]}")
+            return None
+
+    for sl in ("table-tennis", "table_tennis", "tabletennis"):
+        prueba(f"por fecha sport_slug={sl}", URL_BY_DATE, sport_slug=sl, date=hoy_s)
+    prueba("por fecha date=today", URL_BY_DATE, sport_slug="table-tennis", date="today")
+    prueba("en vivo (table-tennis)", BASE + "25092/get+live+matches", sport_slug="table-tennis")
+    prueba("torneo 99075 por fecha", URL_TOURNAMENT, unique_tournament_id="99075", date=hoy_s)
+    seas = prueba("temporadas de 19039", BASE + "25108/get+unique+tournament+seasons",
+                  unique_tournament_id="19039")
+    if seas:
+        ss = [o for o in walk(seas) if "id" in o and ("year" in o or "name" in o)][:3]
+        L.append("      temporadas: " + ", ".join(f"{o.get('id')} ({o.get('year') or o.get('name')})" for o in ss))
+        if ss:
+            rd = prueba("rondas temporada actual", BASE + "25114/get+unique+tournament+season+rounds",
+                        unique_tournament_id="19039", season_id=ss[0]["id"])
+            if rd:
+                cur = next((o.get("currentRound") for o in walk(rd) if "currentRound" in o), None)
+                L.append(f"      ronda actual: {cur}")
+                rnd = (cur or {}).get("round") if isinstance(cur, dict) else cur
+                if rnd:
+                    prueba("partidos de la ronda actual", BASE + "25113/get+unique+tournament+season+round+matches",
+                           unique_tournament_id="19039", season_id=ss[0]["id"], round=rnd)
+    try:
+        tm = _call(BASE + "25083/search+teams", q="Brozhik")
+        tid = next((o.get("id") for o in walk(tm) if "id" in o and "brozhik" in str(o.get("name", "")).lower()), None)
+        L.append(f"   jugador Brozhik: id {tid}")
+        if tid:
+            prueba("próximos partidos de Brozhik", BASE + "26349/get+team+upcoming+matches", team_id=tid)
+            prueba("últimos partidos de Brozhik", BASE + "26348/get+team+finished+matches", team_id=tid)
+    except Exception as ex:
+        L.append(f"   jugador Brozhik: {str(ex)[:70]}")
+
     txt = "\n".join(L)
     os.makedirs(OUT, exist_ok=True)
     path = os.path.join(OUT, "exploracion.txt")
