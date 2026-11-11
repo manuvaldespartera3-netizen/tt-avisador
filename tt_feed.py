@@ -1,5 +1,6 @@
 """
-tt_feed.py - Lee TT Cup desde "SofaScore - Live API" (Zyla Labs) usando la
+tt_feed.py - Lee la liga desde BetsAPI (si FUENTE_DATOS=betsapi; ver tt_betsapi.py)
+o, si no, desde "SofaScore - Live API" (Zyla Labs) usando la
 funcion "partidos programados de un torneo unico" (TT Cup = 15005) y
 reconstruye los grupos de 4 jugadores.
 """
@@ -12,6 +13,7 @@ import urllib.request
 from datetime import datetime, timezone, timedelta
 from itertools import combinations
 
+import tt_betsapi
 from tt_engine import Group, Match
 
 KEY = os.getenv("ZYLA_API_KEY", "").strip()
@@ -234,12 +236,41 @@ def _respaldo_vivo(days):
 ALIAS = {}        # id inventado -> id real (cuando el partido ya ha aparecido)
 
 
+FUENTE_DATOS = os.getenv("FUENTE_DATOS", "zyla").strip().lower()   # "betsapi" o "zyla"
+
+
+def usa_betsapi():
+    return FUENTE_DATOS == "betsapi" and bool(tt_betsapi.TOKEN)
+
+
+def eventos_dia(d):
+    """Partidos de la liga de un dia concreto (para apuntar picks atrasados)."""
+    if usa_betsapi():
+        return tt_betsapi.eventos(TOURNAMENT_ID, [d], vivos=False)
+    return _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d))
+
+
 def fetch():
     """Partidos de la liga de hoy (y de ayer si es de madrugada)."""
     now = datetime.now(TZ)
     days = [now.strftime("%Y-%m-%d")]
     if now.hour < 4:
         days.insert(0, (now - timedelta(days=1)).strftime("%Y-%m-%d"))
+    if usa_betsapi():
+        try:
+            lista = tt_betsapi.eventos(TOURNAMENT_ID, days)
+            FUENTE["modo"] = "BetsAPI"
+            ACUM["betsapi_ok"] = time.time()
+            live = sum(1 for e in lista if e["status"]["type"] == "inprogress")
+            return lista, live
+        except Exception as ex:
+            # un fallo suelto: se salta esta vuelta (cambiar de fuente cambia los
+            # numeros de partido y podria repetir avisos). Solo si BetsAPI lleva
+            # mas de 10 min caida se tira de Zyla.
+            if not KEY or time.time() - ACUM.get("betsapi_ok", 0) < 600:
+                raise
+            print("WARN BetsAPI caida, uso Zyla", ex)
+            FUENTE["modo"] = f"Zyla (BetsAPI falla: {str(ex)[:60]})"
     evs = {}
     pocos = False
     for d in days:
@@ -248,7 +279,8 @@ def fetch():
             pocos = True
         for e in lista:
             evs[str(e.get("id"))] = e
-    FUENTE["modo"] = "consulta por torneo"
+    if not FUENTE["modo"].startswith("Zyla (BetsAPI"):
+        FUENTE["modo"] = "consulta por torneo"
     if pocos:
         # la consulta normal casi no da partidos: respaldo con los partidos en juego
         try:
@@ -288,9 +320,15 @@ def _find_event(o):
 
 def event(event_id):
     """Datos frescos de un partido, o None si no se pueden leer."""
-    if not URL_EVENT or "EVENT_ID" in URL_EVENT:
+    if not str(event_id).startswith("b") and (not URL_EVENT or "EVENT_ID" in URL_EVENT):
         return None
     real = ALIAS.get(str(event_id), str(event_id))
+    if real.startswith("b"):
+        try:
+            return tt_betsapi.evento(real)      # partido de BetsAPI
+        except Exception as ex:
+            print("WARN event BetsAPI", event_id, ex)
+            return None
     if real.startswith("s"):
         return None                 # partido aun no visto (solo deducido)
     try:
@@ -309,8 +347,8 @@ def h2h(event_id):
         return None
     try:
         real = ALIAS.get(str(event_id), str(event_id))
-        if real.startswith("s"):
-            return None
+        if real.startswith(("s", "b")):
+            return None             # deducido o de BetsAPI (sin historial aqui)
         d = _call(URL_H2H, **{H2H_PARAM: real})
 
         def find(o):

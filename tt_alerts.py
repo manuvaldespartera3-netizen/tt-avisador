@@ -47,7 +47,7 @@ POLL_EVENT = int(os.getenv("POLL_EVENT", "8"))   # segundos entre lecturas del p
 TEST = os.getenv("TEST_MODE", "1") == "1"
 REPORT_EVERY = 15 * 60
 STATE_FILE = os.getenv("STATE_FILE", "state.json")
-VERSION = "16"   # al cambiarlo se reenvia el mensaje de arranque
+VERSION = "17"   # al cambiarlo se reenvia el mensaje de arranque
 PICKS_FILE = os.getenv("PICKS_FILE", "picks.csv")
 SUMMARY_HOUR = os.getenv("SUMMARY_AT", "23:45")   # hora del resumen diario
 FIELDS = ["fecha", "hora", "tipo", "pick", "rival", "h2h_pick", "h2h_rival",
@@ -147,8 +147,8 @@ def odds_now(mid, pick_home):
     if not tt_feed.KEY:
         return ""
     mid = tt_feed.ALIAS.get(str(mid), str(mid))
-    if mid.startswith("s"):
-        return ""                      # partido deducido, aun sin id real
+    if mid.startswith(("s", "b")):
+        return ""                      # deducido, o de BetsAPI (id distinto al de Sofascore)
     try:
         data = tt_feed._call(URL_ODDS, match_id=mid)
     except Exception as ex:
@@ -215,9 +215,7 @@ def manual_pick(text, parsed, reply_to):
             d = hoy.replace(month=mo, day=dd)
             if d > hoy:
                 d = d.replace(year=hoy.year - 1)
-            evs = tt_feed._events(tt_feed._call(tt_feed.URL_TOURNAMENT,
-                                                unique_tournament_id=tt_feed.TOURNAMENT_ID,
-                                                date=d.strftime("%Y-%m-%d")))
+            evs = tt_feed.eventos_dia(d.strftime("%Y-%m-%d"))
             parsed = [p for p in (tt_feed.parse(e) for e in evs) if p]
         except Exception as ex:
             send(f"❓ No he podido leer los partidos del {fecha} ({str(ex)[:80]}). Prueba en un rato.",
@@ -499,7 +497,7 @@ def euro_line(label, rows):
 
 
 def startup_report():
-    lines = [f"🟢 Avisador {LIGA} activo (v16)" + (" (MODO PRUEBA)" if TEST else ""),
+    lines = [f"🟢 Avisador {LIGA} activo (v{VERSION})" + (" (MODO PRUEBA)" if TEST else ""),
              "Solo OFICIALES · ⭐ = alta calidad · cada pick trae su cuota mínima",
              "✍️ Responde a cada pick con tu cuota (ej. 1.45) · /resumen = resumen al momento",
              "✍️ /pick Apellido Rival 1.88 = registrar a mano un pick que apostaste",
@@ -509,11 +507,12 @@ def startup_report():
     try:
         events, live = fetch()
         groups, parsed = build_groups(events)
-        lines.append(f"✅ Conexión con Zyla OK: {len(parsed)} partidos {LIGA} hoy, "
-                     f"{live} en vivo, {len(groups)} grupos")
+        lines.append(f"✅ Datos OK ({tt_feed.FUENTE.get('modo', 'Zyla')}): {len(parsed)} partidos "
+                     f"{LIGA} hoy, {live} en vivo, {len(groups)} grupos")
     except Exception as ex:
-        lines.append(f"❌ No pude leer {LIGA} en Zyla: {ex}")
-    lines.append("✅ H2H activo" if tt_feed.URL_H2H else "⏳ H2H pendiente de configurar")
+        lines.append(f"❌ No pude leer {LIGA} ({'BetsAPI' if tt_feed.usa_betsapi() else 'Zyla'}): {ex}")
+    if not tt_feed.usa_betsapi():
+        lines.append("✅ H2H activo" if tt_feed.URL_H2H else "⏳ H2H pendiente de configurar")
     send("\n".join(lines))
 
 

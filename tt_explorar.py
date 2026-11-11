@@ -11,6 +11,7 @@ Lo guarda en backtest/exploracion.txt y avisa por Telegram (bot de TT Cup).
 import json
 import os
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
@@ -25,12 +26,27 @@ OUT = "backtest"
 BUSCAR = ("tt cup", "liga pro", "setka", "elite")
 
 
+HOSTS = ["https://api.b365api.com", "https://api.betsapi.com"]
+
+
 def api(path, **params):
     params["token"] = TOKEN
-    url = f"{BASE}{path}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": "tt-avisador"})
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.loads(r.read().decode())
+    ultimo = None
+    for host in HOSTS:
+        url = f"{host}{path}?{urllib.parse.urlencode(params)}"
+        req = urllib.request.Request(url, headers={"User-Agent": "tt-avisador"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                data = json.loads(r.read().decode())
+            break
+        except urllib.error.HTTPError as ex:
+            try:
+                cuerpo = ex.read().decode()[:200]
+            except Exception:
+                cuerpo = ""
+            ultimo = RuntimeError(f"{host.split('//')[1]}: HTTP {ex.code} {cuerpo}")
+    else:
+        raise ultimo
     if isinstance(data, dict) and data.get("success") in (0, "0", False):
         raise RuntimeError(f"BetsAPI: {str(data)[:200]}")
     return data
@@ -57,6 +73,9 @@ def main():
         L.append("❌ No encuentro el secreto BETSAPI_TOKEN en GitHub (o el workflow no lo pasa).")
         return fin(L)
     hoy = datetime.now(TZ).strftime("%Y%m%d")
+    raro = any(c.isspace() for c in os.getenv("BETSAPI_TOKEN", "")) or not TOKEN.replace("-", "").isalnum()
+    L.append(f"Token: {len(TOKEN)} caracteres" + (" · ⚠️ tiene espacios o símbolos raros" if raro else ""))
+    L.append("")
 
     # 1) deporte: probar el 92 (tenis de mesa en BetsAPI) y comprobar por los nombres
     sport = None
@@ -120,7 +139,37 @@ def main():
                                          for b in ("tt cup", "liga pro"))), None)
     if ej2:
         L.append("   Ejemplo de partido EN JUEGO: " + json.dumps(ej2, ensure_ascii=False)[:1200])
+    L.append("")
+    prueba_lector(L)
     fin(L)
+
+
+def prueba_lector(L):
+    """4) El lector NUEVO del bot (tt_betsapi) con datos reales: grupos que forma."""
+    import tt_betsapi
+    from tt_feed import build_groups, TZ as tz
+    hoy = datetime.now(tz).strftime("%Y-%m-%d")
+    L.append("4) PRUEBA DEL LECTOR NUEVO (lo que verá el bot con BetsAPI):")
+    for sid, nom in (("19039", "Liga Pro"), ("15005", "TT Cup")):
+        try:
+            t0 = time.time()
+            n0 = tt_betsapi.LLAMADAS[0]
+            evs = tt_betsapi.eventos(sid, [hoy])
+            groups, parsed = build_groups(evs)
+            vivos = [p for p in parsed if p["status"] == "inprogress"]
+            fin_ = sum(1 for p in parsed if p["final"])
+            L.append(f"   {nom}: {len(parsed)} partidos ({fin_} terminados, {len(vivos)} en juego) · "
+                     f"{len(groups)} grupos · {tt_betsapi.LLAMADAS[0] - n0} consultas · "
+                     f"{time.time() - t0:.1f} s")
+            for p in vivos[:3]:
+                L.append(f"     🔴 {p['a']} {p['score']} {p['b']} (puntos set: {p['live_pts']})")
+            abiertos = [g for g in groups if g.pending()]
+            for g in abiertos[-4:]:
+                hechos = sum(1 for m in g.matches if m.final)
+                L.append(f"     • {g.matches[0].time} {' · '.join(g.players)}: {hechos}/6 jugados"
+                         + (" ⚠️ dudoso" if getattr(g, "dudoso", False) else ""))
+        except Exception as ex:
+            L.append(f"   {nom}: ❌ {str(ex)[:150]}")
 
 
 def fin(L):

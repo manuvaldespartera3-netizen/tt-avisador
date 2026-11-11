@@ -1,0 +1,185 @@
+"""
+tt_betsapi.py - Lector de BetsAPI (api.b365api.com) para el avisador.
+
+Convierte los partidos de BetsAPI al mismo formato que usa el resto del bot
+(el de Sofascore), para que reglas, avisos y registro no cambien nada.
+  - terminados de hoy   /v3/events/ended?sport_id=92&league_id=X&day=AAAAMMDD
+  - en juego            /v3/events/inplay?sport_id=92&league_id=X
+  - proximos de hoy     /v3/events/upcoming?sport_id=92&league_id=X&day=AAAAMMDD
+  - un partido          /v1/event/view?event_id=N
+Necesita el secreto BETSAPI_TOKEN. Los ids llevan delante una "b" (b13442667)
+para no confundirlos nunca con los de Sofascore.
+"""
+import json
+import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+TOKEN = os.getenv("BETSAPI_TOKEN", "").strip()
+HOSTS = ["https://api.b365api.com", "https://api.betsapi.com"]
+SPORT = "92"                                  # tenis de mesa en BetsAPI
+LIGAS = {"15005": "29097",                    # TT Cup
+         "19039": "22742",                    # Czech Liga Pro
+         "15004": "22307",                    # Setka Cup
+         "19041": "29128"}                    # TT Elite Series
+ESTADO = {"0": "notstarted", "1": "inprogress", "3": "finished"}
+CACHE_S = int(os.getenv("BETSAPI_CACHE_S", "120"))
+_CACHE = {}                                   # (tipo, liga, dia) -> (hora, lista)
+_ENJUEGO = {}                                 # liga -> ids vistos en juego aun sin terminar
+_VISTO = {}                                   # id -> ultimo estado conocido (no retrocede)
+_RANGO = {"notstarted": 0, "canceled": 0, "inprogress": 1, "finished": 2}
+LLAMADAS = [0]                                # contador (para vigilar el limite por hora)
+
+
+def api(path, **params):
+    params["token"] = TOKEN
+    ultimo = None
+    for host in HOSTS:
+        url = f"{host}{path}?{urllib.parse.urlencode(params)}"
+        req = urllib.request.Request(url, headers={"User-Agent": "tt-avisador"})
+        for intento in range(3):
+            try:
+                LLAMADAS[0] += 1
+                with urllib.request.urlopen(req, timeout=25) as r:
+                    data = json.loads(r.read().decode())
+                if isinstance(data, dict) and str(data.get("success")) == "0":
+                    raise RuntimeError(f"BetsAPI: {str(data.get('error', data))[:120]}")
+                return data
+            except urllib.error.HTTPError as ex:
+                ultimo = RuntimeError(f"BetsAPI HTTP {ex.code}")   # sin la URL (lleva el token)
+                if ex.code in (401, 403):
+                    break                      # token: no se arregla reintentando
+            except Exception as ex:
+                ultimo = RuntimeError(f"BetsAPI: {type(ex).__name__}")
+            time.sleep(1 + intento)
+    raise ultimo
+
+
+def _paginas(path, **params):
+    out = []
+    for page in range(1, 11):
+        d = api(path, page=page, **params)
+        res = d.get("results") or []
+        out += res
+        pg = d.get("pager") or {}
+        tot, per = int(pg.get("total", 0) or 0), int(pg.get("per_page", 0) or 0)
+        if not res or not per or page * per >= tot:
+            break
+    return out
+
+
+def nombre(n):
+    """'Rene Kowal' -> 'Kowal R.' (como Sofascore: el bot usa el 1.er trozo como apellido)."""
+    t = str(n or "?").split()
+    if len(t) < 2 or t[-1].endswith("."):
+        return " ".join(t) or "?"
+    return f"{' '.join(t[1:])} {t[0][0].upper()}."
+
+
+def _set_hecho(a, b):
+    return max(a, b) >= 11 and abs(a - b) >= 2
+
+
+def convertir(e):
+    """Partido de BetsAPI -> formato Sofascore que entiende tt_feed.parse()."""
+    st = ESTADO.get(str(e.get("time_status")), "canceled")
+    sc = e.get("scores") or {}
+    per = []
+    for k in sorted(sc, key=lambda x: int(x) if str(x).isdigit() else 99):
+        try:
+            per.append((int(sc[k].get("home") or 0), int(sc[k].get("away") or 0)))
+        except (TypeError, ValueError, AttributeError):
+            pass
+    hs, as_ = {}, {}
+    for i, (a, b) in enumerate(per, 1):
+        hs[f"period{i}"], as_[f"period{i}"] = a, b
+    if st == "finished":
+        try:
+            sa, sb = (int(x) for x in str(e.get("ss") or "").split("-"))
+        except ValueError:
+            sa = sum(1 for a, b in per if a > b)
+            sb = sum(1 for a, b in per if b > a)
+    elif st == "inprogress":
+        # en juego: 'ss' no sirve (a veces son los puntos del set); se cuentan solo
+        # los sets YA terminados; el ultimo, si no ha acabado, es el set en curso
+        hechos = per if per and _set_hecho(*per[-1]) else per[:-1]
+        sa = sum(1 for a, b in hechos if a > b)
+        sb = sum(1 for a, b in hechos if b > a)
+        if max(sa, sb) >= 3:
+            st = "finished"                   # ya acabo aunque BetsAPI aun no lo marque
+        elif len(hechos) == len(per):
+            n = len(per) + 1                  # set nuevo, aun 0-0
+            hs[f"period{n}"], as_[f"period{n}"] = 0, 0
+    else:
+        sa = sb = 0
+    hs["current"], as_["current"] = sa, sb
+    lg = e.get("league") or {}
+    ev = {"id": "b" + str(e.get("id")), "status": {"type": st},
+          "homeTeam": {"name": nombre((e.get("home") or {}).get("name"))},
+          "awayTeam": {"name": nombre((e.get("away") or {}).get("name"))},
+          "homeScore": hs, "awayScore": as_,
+          "startTimestamp": int(e.get("time") or 0),
+          "tournament": {"name": lg.get("name"),
+                         "uniqueTournament": {"id": lg.get("id"), "name": lg.get("name")}},
+          "bet365_id": e.get("bet365_id")}
+    if st == "finished" and sa != sb:
+        ev["winnerCode"] = 1 if sa > sb else 2
+    return ev
+
+
+def _sin_retroceso(ev):
+    """Un partido terminado nunca vuelve a 'en juego' ni a 'sin empezar' porque
+    una lista vaya con retraso."""
+    prev = _VISTO.get(ev["id"])
+    if prev and _RANGO[prev["status"]["type"]] > _RANGO.get(ev["status"]["type"], 0):
+        return prev
+    _VISTO[ev["id"]] = ev
+    return ev
+
+
+def eventos(sofascore_id, days, vivos=True):
+    """Todos los partidos de la liga en esos dias (AAAA-MM-DD), ya convertidos.
+    Terminados y proximos se piden como mucho cada CACHE_S segundos (salvo que
+    acabe un partido: entonces los terminados se piden al momento); los que
+    estan en juego, siempre frescos."""
+    liga = LIGAS.get(str(sofascore_id), str(sofascore_id))
+    ahora = time.time()
+    vivos_ahora = []
+    if vivos:
+        vivos_ahora = [e for e in (api("/v3/events/inplay", sport_id=SPORT, league_id=liga)
+                                   .get("results") or [])
+                       if str((e.get("league") or {}).get("id")) == liga]
+    ids_vivos = {str(e.get("id")) for e in vivos_ahora}
+    evs = {}
+    for tipo in ("upcoming", "ended"):        # orden: proximos < en juego < terminados
+        if tipo == "ended":
+            for e in vivos_ahora:              # en juego (fresco) pisa a 'proximos'
+                evs[str(e.get("id"))] = e
+        for d in days:
+            dd = d.replace("-", "")
+            key = (tipo, liga, dd)
+            viejo = key not in _CACHE or ahora - _CACHE[key][0] > CACHE_S
+            if tipo == "ended" and not viejo:
+                # un partido que estaba en juego ya no lo esta y aun no sale entre
+                # los terminados guardados: pedirlos YA (resultado al instante)
+                hechos = {str(e.get("id")) for e in _CACHE[key][1]}
+                viejo = bool(_ENJUEGO.get(liga, set()) - ids_vivos - hechos)
+            if viejo:
+                _CACHE[key] = (ahora, _paginas(f"/v3/events/{tipo}", sport_id=SPORT,
+                                               league_id=liga, day=dd))
+            for e in _CACHE[key][1]:
+                evs[str(e.get("id"))] = e     # 'terminados' (va al final) pisa a todo
+    if vivos:
+        # los que dejan de verse en juego se siguen esperando hasta que salgan terminados
+        hechos = {k for k, e in evs.items() if str(e.get("time_status")) == "3"}
+        _ENJUEGO[liga] = ids_vivos | ((_ENJUEGO.get(liga, set()) - hechos) & set(evs))
+    return [_sin_retroceso(convertir(e)) for e in evs.values()]
+
+
+def evento(mid):
+    """Un partido concreto, fresco (para vigilar el partido decisivo)."""
+    d = api("/v1/event/view", event_id=str(mid).lstrip("b"))
+    res = d.get("results") or []
+    return _sin_retroceso(convertir(res[0])) if res else None
