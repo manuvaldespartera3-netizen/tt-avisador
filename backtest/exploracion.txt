@@ -2,30 +2,43 @@
 
 Token: 21 caracteres
 
-1) sport_id=92: 15 en juego · ligas: Czech Liga Pro ×6, Setka Cup ×5, TT Elite Series ×2, TT Cup ×2
+1) sport_id=92: 11 en juego · ligas: Setka Cup ×4, TT Elite Series ×3, Czech Liga Pro ×3, TT Cup ×1
    → tenis de mesa = sport_id 92
 
 2) Ligas de tenis de mesa HOY (número · nombre: terminados / en juego / próximos):
-   22307 · Setka Cup: 155 / 5 / 10 ◀
-   29128 · TT Elite Series: 117 / 2 / 25 ◀
-   29097 · TT Cup: 112 / 2 / 3 ◀
-   22742 · Czech Liga Pro: 94 / 6 / 7 ◀
-   47143 · WTT Contender Istanbul Quals: 9 / 0 / 0
-   47142 · WTT Contender Istanbul Quals Women: 8 / 0 / 0
-   47147 · WTT Contender Istanbul WD: 4 / 0 / 0
-   18611 · European Champions League Women: 1 / 0 / 0
+   22307 · Setka Cup: 0 / 4 / 219 ◀
+   22742 · Czech Liga Pro: 0 / 3 / 109 ◀
+   29128 · TT Elite Series: 0 / 3 / 105 ◀
+   29097 · TT Cup: 0 / 1 / 38 ◀
+   47143 · WTT Contender Istanbul Quals: 0 / 0 / 12
+   47142 · WTT Contender Istanbul Quals Women: 0 / 0 / 10
+   25065 · Challenger Series TT: 0 / 0 / 4
+   47147 · WTT Contender Istanbul WD: 0 / 0 / 2
+   47132 · WTT Contender Istanbul Women: 0 / 0 / 1
 
-3) Ejemplo de partido terminado (así vienen los datos):
-   {"id": "13442666", "sport_id": "92", "time": "1794435600", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "683480", "name": "David Stusek", "image_id": 0, "cc": "cz"}, "away": {"id": "684567", "name": "Petr Vicherek", "image_id": 0, "cc": "cz"}, "ss": "0-3", "scores": {"1": {"home": "11", "away": "13"}, "2": {"home": "7", "away": "11"}, "3": {"home": "6", "away": "11"}}}
-   Detalle (event/view): [{"id": "13442666", "sport_id": "92", "time": "1794435600", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "683480", "name": "David Stusek", "image_id": 0, "cc": "cz"}, "away": {"id": "684567", "name": "Petr Vicherek", "image_id": 0, "cc": "cz"}, "ss": "0-3", "scores": {"1": {"home": "11", "away": "13"}, "2": {"home": "7", "away": "11"}, "3": {"home": "6", "away": "11"}}, "timeline": [{"id": "327175834", "gm": "1", "te": "0", "ss": "1-0"}, {"id": "327175847", "gm": "1", "te": "1", "ss": "1-1"}, {"id": "327175869", "gm": "1", "te": "1", "ss": "1-2"}, {"id": "327175887", "gm": "1", "te": "1", "ss": "1-3"}, {"id": "327175907", "gm": "1", "te": "0", "ss": "2-3"}, {"id": "327175921", "gm": "1", "te": "1", "ss": "2-4"}, {"id": "327175949", "gm": "1", "te": "1", "ss": "2-5"}, {"id": "327175966", "gm": "1", "te": "1", "ss": "2-6"}, {"id": "327175974", "gm": "1", "te": "1", "ss": "2-7"}, {"id": "327175999", "gm": "1", "te": "1", "ss": "2-8"}, {"id": "327176017", "gm": "1", "te": "0", "ss": "3-8"}, {"id": "327176032", "gm": "1", "te": "0", "ss": "4-8"}, {"id": "327176043", "gm": "1", "te": "0", "ss": "5-8"}, {"id": "327176067", "gm": "1", "te": "0", "ss": "6-8"}, {"id": "327176087", "gm": "1", "te": "0", "ss": "7-8"}, {"id": "327176107", "gm": "1", "te": "1", "ss": "7-9"}, {"id": "327176125", "gm": "1", "te": "1", "ss": "7-10"}, {"id": "327176134", "gm": "1", "te": "0", "ss": "8-10"}, {"id": "327176147", "gm": "1", "te": "0", "ss": "9-10"}, 
-   Ejemplo de partido EN JUEGO: {"id": "13436151", "sport_id": "92", "time": "1794423600", "time_status": "1", "league": {"id": "22742", "name": "Czech Liga Pro", "cc": "cz"}, "home": {"id": "994720", "name": "Viktor Vejvoda", "image_id": 0, "cc": "cz"}, "away": {"id": "341166", "name": "Milan Klement", "image_id": 0, "cc": "cz"}, "ss": "0-0", "scores": {"1": {"home": "11", "away": "8"}, "2": {"home": "10", "away": "12"}, "3": {"home": "11", "away": "8"}, "4": {"home": "5", "away": "11"}, "5": {"home": "7", "away": "11"}}, "bet365_id": "204383981"}
+   Ejemplo de partido EN JUEGO: {"id": "13443054", "sport_id": "92", "time": "1794437700", "time_status": "1", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "380926", "name": "Marek Kulisek", "image_id": 0, "cc": "cz"}, "away": {"id": "384003", "name": "Martin Sulc", "image_id": 0, "cc": "cz"}, "ss": "4-5", "scores": {"1": {"home": "8", "away": "11"}, "2": {"home": "9", "away": "11"}, "3": {"home": "11", "away": "9"}, "4": {"home": "4", "away": "4"}}, "bet365_id": "204475255"}
 
 4) PRUEBA DEL LECTOR NUEVO (lo que verá el bot con BetsAPI):
-   Liga Pro: 197 partidos (185 terminados, 5 en juego) · 20 grupos · 6 consultas · 0.8 s
-     🔴 Vondrak M. 1-0 Petr Z. (puntos set: 3)
-     🔴 Svacha O. 0-1 Nohejl 2005 V. (puntos set: 10)
-     🔴 Walek A. 1-0 Heczko D. (puntos set: 7)
-   TT Cup: 168 partidos (163 terminados, 2 en juego) · 17 grupos · 6 consultas · 6.1 s
-     🔴 Kosacky A. 1-1 Vanek P. (puntos set: 19)
-     🔴 Zeman R. 1-1 Kolbusovsky M. (puntos set: 5)
-     • 20:55 Sulc M. · Vanek P. · Kosacky A. · Kulisek M.: 5/6 jugados
+   Liga Pro: 153 partidos (0 terminados, 3 en juego) · 20 grupos · 5 consultas · 1.3 s
+     🔴 Hasmanda R. 1-0 Syroha M. (puntos set: 14)
+     🔴 Regner T. 1-1 Smrcek M. (puntos set: 0)
+     🔴 Hlawatschke A. 2-0 Vizek M. (puntos set: 6)
+     • 20:00 Pavelka R. · Fojt P. · Dousa T. · Vedmoch M.: 0/6 jugados
+     • 20:00 Regner T. · Trinta M. · Briza F. · Kolenic T.: 0/6 jugados
+     • 20:00 Kypr T. · Pagac Z. · Holub M. · Kasnik S.: 0/6 jugados
+     • 20:00 Niezgoda R. · Zika T. · Dzida J. · Szotkowski J.: 0/6 jugados
+   TT Cup: 39 partidos (0 terminados, 1 en juego) · 1 grupos · 3 consultas · 0.6 s
+     🔴 Kulisek M. 1-2 Sulc M. (puntos set: 8)
+     • 12:05 Nevrtal T. · Neterda R. · Lovl J. · Ruzicka J.: 0/6 jugados
+
+5) PARA EL CANAL RATING LIGA PRO:
+   a) próximos de Liga Pro en BetsAPI: 150
+      /v2/event/odds/summary Milan Smrcek – Ondrej Kucirek (12/11 01:00): {"Bet365": {"matching_dir": 1, "odds_update": {"92_1": 1794436852, "92_2": 1794436852, "92_3": 1794436852}, "odds": {"start": {"92_1": {"id": "132841843", "home_od": "1.615", "away_od": "2.200", "ss": null, "add_time": "1794318826"}, "92_2": {"id": "74760203", "home_od": "2.500", "handicap": "-1.5", "away_od": "1.500", "ss": null, "add_time": "1794321911"}, "92_3": {"id": "67830566", "over_od": "1.833", "handicap": "77.5", "under_od": "1.833", "ss": null, "add_time": "1794321911"}}, "end": {"92_
+      /v2/event/odds Milan Smrcek – Ondrej Kucirek (12/11 01:00): {"stats": {"matching_dir": 1, "odds_update": {"92_1": 1794436852, "92_2": 1794436852, "92_3": 1794436852}}, "odds": {"92_1": [{"id": "132841843", "home_od": "1.615", "away_od": "2.200", "ss": null, "add_time": "1794318826"}], "92_2": [{"id": "74760203", "home_od": "2.500", "handicap": "-1.5", "away_od": "1.500", "ss": null, "add_time": "1794321911"}], "92_3": [{"id": "67830566", "over_od": "1.833", "handicap": "77.5", "under_od": "1.833", "ss": null, "add_time": "1794321911"}]}}
+      /v2/event/odds/summary Michal Syroha – Petr Bruzek (12/11 01:00): {"Bet365": {"matching_dir": 1, "odds_update": {"92_1": 1794438266, "92_2": 1794438266, "92_3": 1794438266}, "odds": {"start": {"92_1": {"id": "132841907", "home_od": "2.750", "away_od": "1.400", "ss": null, "add_time": "1794318911"}, "92_2": {"id": "74760293", "home_od": "1.800", "handicap": "+1.5", "away_od": "1.909", "ss": null, "add_time": "1794322016"}, "92_3": {"id": "67830646", "over_od": "1.833", "handicap": "74.5", "under_od": "1.833", "ss": null, "add_time": "1794322016"}}, "end": {"92_
+      /v2/event/odds Michal Syroha – Petr Bruzek (12/11 01:00): {"stats": {"matching_dir": 1, "odds_update": {"92_1": 1794438266, "92_2": 1794438266, "92_3": 1794438266}}, "odds": {"92_1": [{"id": "132841907", "home_od": "2.750", "away_od": "1.400", "ss": null, "add_time": "1794318911"}], "92_2": [{"id": "74760293", "home_od": "1.800", "handicap": "+1.5", "away_od": "1.909", "ss": null, "add_time": "1794322016"}], "92_3": [{"id": "67830646", "over_od": "1.833", "handicap": "74.5", "under_od": "1.833", "ss": null, "add_time": "1794322016"}]}}
+      /v2/event/odds/summary Martin Vizek – Martin Sobisek (12/11 01:00): {"Bet365": {"matching_dir": 1, "odds_update": {"92_1": 1794438540, "92_2": 1794438540, "92_3": 1794438540}, "odds": {"start": {"92_1": {"id": "132843986", "home_od": "1.909", "away_od": "1.800", "ss": null, "add_time": "1794321414"}, "92_2": {"id": "74761906", "home_od": "1.400", "handicap": "+1.5", "away_od": "2.750", "ss": null, "add_time": "1794324329"}, "92_3": {"id": "67832053", "over_od": "1.833", "handicap": "76.5", "under_od": "1.833", "ss": null, "add_time": "1794324329"}}, "end": {"92_
+      /v2/event/odds Martin Vizek – Martin Sobisek (12/11 01:00): {"stats": {"matching_dir": 1, "odds_update": {"92_1": 1794438540, "92_2": 1794438540, "92_3": 1794438540}}, "odds": {"92_1": [{"id": "132843986", "home_od": "1.909", "away_od": "1.800", "ss": null, "add_time": "1794321414"}], "92_2": [{"id": "74766958", "home_od": "1.400", "handicap": "+1.5", "away_od": "2.750", "ss": null, "add_time": "1794331643"}, {"id": "74766792", "home_od": "-", "handicap": "+1.5", "away_od": "-", "ss": null, "add_time": "1794331328"}, {"id": "74766567", "home_od": "1.400"
+   b) web oficial: 10 torneos de hoy/mañana · ids [38019, 38022, 38023]…[38034, 38039, 38046]
+      torneo 38046 'Tournament A18. League 450-500' empieza 2026-11-12T07:00:00Z · jugadores [('Kalvar', 487), ('Tyn', 462), ('Zientek', 460), ('Schneider', 434)] · partidos 8 (8 sin jugar) · ej. partido: {"id": 321138, "meet_id": null, "stage_id": 1, "status": 1, "next_game_status": 1, "start_game": "2026-11-12T07:00:00Z", "side_one_id": 1768, "side_two_id": 1013, "results": {"duration": null, "score_one": null, "score_two": null, "period_scores": nu
+      torneo 38039 'Tournament A17. League 600-700' empieza 2026-11-12T07:00:00Z · jugadores [('Klusacek', 669), ('Svoboda', 680), ('Parhomenko', 646), ('Prokupek', 665)] · partidos 8 (8 sin jugar) · ej. partido: {"id": 321082, "meet_id": null, "stage_id": 1, "status": 1, "next_game_status": 1, "start_game": "2026-11-12T07:00:00Z", "side_one_id": 1647, "side_two_id": 1548, "results": {"duration": null, "score_one": null, "score_two": null, "period_scores": nu
