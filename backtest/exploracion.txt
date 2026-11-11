@@ -1,14 +1,14 @@
 🔎 DIAGNÓSTICO DE DATOS (Zyla/Sofascore)
 
 1) Partidos por liga (número de torneo actual):
-   TT Cup (15005): 362 / 348 / 246  [antes de ayer / ayer / hoy]
-      torneos: TT Cup ×956
+   TT Cup (15005): 362 / 348 / 251  [antes de ayer / ayer / hoy]
+      torneos: TT Cup ×961
    Czech Liga Pro (19039): 291 / 111 / 1  [antes de ayer / ayer / hoy]
       torneos: Czech Liga Pro ×403
    TT Elite Series (19041): 500 / 195 / 0  [antes de ayer / ayer / hoy]
       torneos: TT Elite Series ×695
-   Setka Cup (15004): 796 / 799 / 606  [antes de ayer / ayer / hoy]
-      torneos: Setka Cup ×2201
+   Setka Cup (15004): 796 / 799 / 611  [antes de ayer / ayer / hoy]
+      torneos: Setka Cup ×2206
 
 2) ¿En qué torneo salen ahora jugadores de Liga Pro?
    Brozhik: 20 partidos recientes
@@ -55,3 +55,15 @@
 
 6) TODOS los partidos de tenis de mesa de HOY, por torneo:
    error (HTTP Error 400: Bad Request)
+
+7) Pruebas de otras vías para leer Liga Pro hoy:
+   por fecha sport_slug=table-tennis: HTTP Error 400: Bad Request
+   por fecha sport_slug=table_tennis: HTTP Error 400: Bad Request
+   por fecha sport_slug=tabletennis: HTTP Error 400: Bad Request
+   por fecha date=today: HTTP Error 400: Bad Request
+   en vivo (table-tennis): OK · 15 partidos · de Liga Pro 4
+   torneo 99075 por fecha: OK · 0 partidos · de Liga Pro 0
+   temporadas de 19039: OK · 0 partidos · de Liga Pro 0
+      temporadas: 96742 (2026), 107012 (2026)
+   rondas temporada actual: OK · 0 partidos · de Liga Pro 0
+   jugador Brozhik: id None
