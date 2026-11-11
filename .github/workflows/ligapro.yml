@@ -1,7 +1,8 @@
 name: Liga Pro seguimiento
 
 # Avisador de Czech Liga Pro: el MISMO programa que TT Cup (tt_alerts.py), con
-# las reglas de Liga Pro. Totalmente aparte del avisador de TT Cup:
+# las reglas de Liga Pro. Los datos salen de BetsAPI (Zyla solo de reserva si
+# BetsAPI lleva mas de 10 min caida). Totalmente aparte del avisador de TT Cup:
 #  - su propia memoria (state_ligapro.json) y su propio grupo de ejecuciones
 #  - guarda sus picks en la rama "ligapro-datos" (nunca toca main ni picks.csv)
 #  - si existe el secreto TELEGRAM_TOKEN_LP, usa SU PROPIO bot de Telegram (y
@@ -48,6 +49,8 @@ jobs:
 
       - name: Avisador Liga Pro
         env:
+          FUENTE_DATOS: "betsapi"
+          BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}
           ZYLA_API_KEY: ${{ secrets.ZYLA_API_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN_LP || secrets.TELEGRAM_TOKEN }}
           MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
