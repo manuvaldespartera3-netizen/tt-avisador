@@ -141,7 +141,115 @@ def main():
         L.append("   Ejemplo de partido EN JUEGO: " + json.dumps(ej2, ensure_ascii=False)[:1200])
     L.append("")
     prueba_lector(L)
+    L.append("")
+    prueba_rating(L)
     fin(L)
+
+
+def _nuxt(html):
+    """Datos que lleva dentro la web oficial de Liga Pro (formato Nuxt)."""
+    import re
+    m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', html, re.S)
+    if not m:
+        return None
+    d = json.loads(m.group(1))
+    memo = {}
+    env = ("Reactive", "ShallowReactive", "Ref", "ShallowRef", "EmptyRef", "EmptyShallowRef", "NuxtError")
+
+    def r(i):
+        if i in memo:
+            return memo[i]
+        v = d[i]
+        if isinstance(v, list):
+            if v and isinstance(v[0], str) and v[0] in env:
+                out = r(v[1]) if len(v) > 1 else None
+            elif v and isinstance(v[0], str) and v[0] == "Set":
+                out = [r(x) for x in v[1:]]
+            elif v and isinstance(v[0], str) and v[0] == "Date":
+                out = v[1]
+            else:
+                memo[i] = out = []
+                out.extend(r(x) if isinstance(x, int) else x for x in v)
+                return out
+        elif isinstance(v, dict):
+            memo[i] = out = {}
+            for k, x in v.items():
+                out[k] = r(x) if isinstance(x, int) else x
+            return out
+        else:
+            out = v
+        memo[i] = out
+        return out
+    return r(0)
+
+
+def _web(url):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+        "Accept-Language": "en"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return r.read().decode("utf-8", "replace")
+
+
+def prueba_rating(L):
+    """5) Para el canal RATING LIGA PRO: ¿hay en directo (a) cuotas en BetsAPI
+    antes del partido y (b) el rating oficial de los torneos que aun no han empezado?"""
+    import re
+    from datetime import timedelta
+    L.append("5) PARA EL CANAL RATING LIGA PRO:")
+    hoy = datetime.now(TZ)
+    # (a) cuotas de BetsAPI de partidos de Liga Pro que aun no han empezado
+    try:
+        prox = todas("/v3/events/upcoming", sport_id=92, league_id=22742, day=hoy.strftime("%Y%m%d"))
+        if hoy.hour >= 20:
+            prox += todas("/v3/events/upcoming", sport_id=92, league_id=22742,
+                          day=(hoy + timedelta(days=1)).strftime("%Y%m%d"))
+        L.append(f"   a) próximos de Liga Pro en BetsAPI: {len(prox)}")
+        hechos = 0
+        for e in sorted(prox, key=lambda x: int(x.get("time") or 0))[:3]:
+            cuando = datetime.fromtimestamp(int(e["time"]), TZ).strftime("%d/%m %H:%M")
+            nom = f"{(e.get('home') or {}).get('name')} – {(e.get('away') or {}).get('name')} ({cuando})"
+            for path in ("/v2/event/odds/summary", "/v2/event/odds"):
+                try:
+                    d = api(path, event_id=e["id"])
+                    res = d.get("results") or {}
+                    txt = json.dumps(res, ensure_ascii=False)
+                    L.append(f"      {path} {nom}: {txt[:500]}")
+                    hechos += 1
+                except Exception as ex:
+                    L.append(f"      {path} {nom}: ❌ {str(ex)[:150]}")
+        if not prox:
+            L.append("      (ahora no hay próximos: lánzalo de día)")
+    except Exception as ex:
+        L.append(f"   a) ❌ {str(ex)[:150]}")
+    # (b) rating oficial en la web de Liga Pro para los torneos de hoy/mañana
+    try:
+        d0 = hoy.date()
+        html = _web(f"https://tt.league-pro.com/en/tournaments?date_from={d0}&date_to={d0 + timedelta(days=1)}")
+        root = _nuxt(html)
+        texto = html + (json.dumps(root) if root else "")
+        ids = sorted({int(x) for x in re.findall(r"/tournaments/(\d{5})(?!\d)", texto)}
+                     | {int(x) for x in re.findall(r'"id":\s*(\d{5})(?!\d)', texto)})
+        L.append(f"   b) web oficial: {len(ids)} torneos de hoy/mañana · ids {ids[:3]}…{ids[-3:]}")
+        vistos = 0
+        for tid in reversed(ids):
+            try:
+                pd = _nuxt(_web(f"https://tt.league-pro.com/en/tournaments/{tid}"))["data"]["tournament-page"]["pageData"]
+            except Exception:
+                continue
+            t, w = pd["tournament"], pd["widgets"]
+            lados = [(((s.get("player") or {}).get("surname_en")), s.get("rating_before_tournament"))
+                     for s in (w.get("sides") or [])]
+            ms = w.get("matches") or []
+            sin = sum(1 for m in ms if m.get("status") != 3)
+            L.append(f"      torneo {tid} '{t.get('name_en')}' empieza {t.get('start_date')} · "
+                     f"jugadores {lados} · partidos {len(ms)} ({sin} sin jugar) · "
+                     f"ej. partido: {json.dumps(ms[0], ensure_ascii=False)[:250] if ms else '-'}")
+            vistos += 1
+            if vistos >= 2:
+                break
+    except Exception as ex:
+        L.append(f"   b) ❌ {str(ex)[:150]}")
 
 
 def prueba_lector(L):
