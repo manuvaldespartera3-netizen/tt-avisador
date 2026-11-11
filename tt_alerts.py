@@ -313,7 +313,8 @@ def grupos_text(parsed, groups):
     now = time.time()
     vivos = [g for g in groups if g.pending()]
     L = [f"🔎 {LIGA}: {len(parsed)} partidos hoy en los datos · {len(groups)} grupos "
-         f"formados · {len(vivos)} sin terminar"]
+         f"formados · {len(vivos)} sin terminar",
+         f"Fuente: {tt_feed.FUENTE.get('modo', 'consulta por torneo')}"]
     for g in sorted(vivos, key=lambda g: g.matches[0].time)[:15]:
         jug = sum(1 for x in g.matches if x.final)
         vivo = next((x for x in g.matches if x.live is not None), None)

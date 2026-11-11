@@ -83,15 +83,60 @@ def _events(obj):
     return []
 
 
+# Si la consulta por torneo devuelve casi nada (le ha pasado a Liga Pro), se
+# piden TODOS los partidos de tenis de mesa del dia y se filtran por el torneo.
+URL_BY_DATE = os.getenv(
+    "ZYLA_URL_BY_DATE",
+    "https://zylalabs.com/api/12787/sofascore+-+live+api/25093/get+matches+by+date")
+NOMBRES = {"15005": "tt cup", "19039": "czech liga pro", "19041": "tt elite series",
+           "15004": "setka cup"}
+TORNEO_NOMBRE = os.getenv("TORNEO_NOMBRE", NOMBRES.get(str(TOURNAMENT_ID), "")).lower()
+MIN_POR_TORNEO = int(os.getenv("MIN_POR_TORNEO", "20"))
+FUENTE = {"modo": "torneo"}           # para /grupos: de donde salen los datos
+
+
+def _es_del_torneo(e):
+    t = e.get("tournament") or {}
+    ut = t.get("uniqueTournament") or {}
+    if str(ut.get("id", "")) == str(TOURNAMENT_ID):
+        return True
+    nombre = (ut.get("name") or t.get("name") or "").lower()
+    return bool(TORNEO_NOMBRE) and nombre.startswith(TORNEO_NOMBRE)
+
+
+def _todos_del_dia(d):
+    data = _call(URL_BY_DATE, sport_slug="table-tennis", date=d)
+    return [e for e in _events(data) if _es_del_torneo(e)]
+
+
 def fetch():
-    """Partidos de TT Cup de hoy (y de ayer si es de madrugada)."""
+    """Partidos de la liga de hoy (y de ayer si es de madrugada)."""
     now = datetime.now(TZ)
     days = [now.strftime("%Y-%m-%d")]
     if now.hour < 4:
         days.insert(0, (now - timedelta(days=1)).strftime("%Y-%m-%d"))
     evs = {}
     for d in days:
-        for e in _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d)):
+        if FUENTE.get(d) == "respaldo":
+            # ya se vio que hoy la consulta por torneo no sirve: directos al respaldo
+            try:
+                lista = _todos_del_dia(d)
+            except Exception as ex:
+                print("WARN respaldo por fecha", ex)
+                lista = _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d))
+        else:
+            lista = _events(_call(URL_TOURNAMENT, unique_tournament_id=TOURNAMENT_ID, date=d))
+            if len(lista) < MIN_POR_TORNEO and (now.hour >= 6 or d != days[-1]):
+                try:
+                    otra = _todos_del_dia(d)
+                    if len(otra) > len(lista):
+                        lista = otra
+                        FUENTE[d] = "respaldo"
+                except Exception as ex:
+                    print("WARN respaldo por fecha", ex)
+        FUENTE["modo"] = ("todos los partidos del día, filtrados (respaldo)"
+                          if FUENTE.get(d) == "respaldo" else "consulta por torneo")
+        for e in lista:
             evs[e.get("id")] = e
     live = sum(1 for e in evs.values() if (e.get("status") or {}).get("type") == "inprogress")
     return list(evs.values()), live
