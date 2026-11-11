@@ -376,6 +376,15 @@ def ver_text(name, parsed, groups):
     return "\n".join(L)[:3900]
 
 
+AYUDA = ("📖 Lo que puedes escribirme:\n"
+         "• 1.65 → (respondiendo a un pick) la cuota a la que apostaste · 'no' si no apostaste\n"
+         "• grupos (o estado) → los grupos que estoy siguiendo ahora\n"
+         "• ver Apellido → lo que veo del grupo de ese jugador\n"
+         "• resumen → el resumen al momento\n"
+         "• pick Apellido Rival 1.88 120 → apuntar a mano una apuesta (añade 09/11 si es de otro día)\n"
+         "• borrar Apellido Rival → quitar una apuesta puesta a mano")
+
+
 def read_replies(parsed=(), groups=()):
     """Lee lo que escribes al bot:
        - respondiendo a un pick: '1.45'  o  '1.45 120'  o  'no'
@@ -400,6 +409,15 @@ def read_replies(parsed=(), groups=()):
             continue
         text = (msg.get("text") or "").strip().lower()
         if not text:
+            continue
+        # se aceptan las ordenes con o sin "/" (estado, grupos, resumen, ayuda...)
+        palabra = text.split()[0].lstrip("/")
+        if palabra in ("estado", "grupos", "resumen", "ver", "pick", "borrar", "ayuda", "help", "start"):
+            text = "/" + text.lstrip("/")
+        if palabra == "estado":
+            text = "/grupos"
+        if text.startswith(("/ayuda", "/help", "/start")):
+            send(AYUDA, msg.get("message_id"))
             continue
         if text.startswith("/resumen"):
             send(summary_text(datetime.now(tt_feed.TZ).strftime("%Y-%m-%d")))
@@ -436,7 +454,10 @@ def read_replies(parsed=(), groups=()):
             changed = True
             continue
         nums = [n for n in (_num(t) for t in text.split()) if n is not None]
-        if not nums or not (1.01 <= nums[0] <= 50):
+        if not nums:
+            send("❓ No te entiendo.\n" + AYUDA, msg.get("message_id"))
+            continue
+        if not (1.01 <= nums[0] <= 50):
             send("❓ Escribe la cuota así: 1.45   (o 1.45 120 si cambias la cantidad)",
                  msg.get("message_id"))
             continue
