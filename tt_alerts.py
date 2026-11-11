@@ -36,6 +36,7 @@ LIGA_TAG = os.getenv("LIGA_TAG", "").strip()           # prefijo en cada mensaje
 LEER_MENSAJES = os.getenv("LEER_MENSAJES", "1") == "1"  # leer cuotas, /pick, /ver...
 ESTRELLAS = os.getenv("ESTRELLAS", "1") == "1"          # categoria ⭐ (TT Cup si, Liga Pro no)
 FILTRO_NOCHE = os.getenv("FILTRO_NOCHE", "1") == "1"    # de noche solo ⭐ (TT Cup si, Liga Pro no)
+MIN_PARTIDOS = int(os.getenv("MIN_PARTIDOS", "30"))     # por debajo, algo falla en los datos
 POLL = int(os.getenv("POLL_SECONDS", "60"))     # ritmo normal
 POLL_FAST = int(os.getenv("POLL_FAST", "15"))    # ritmo rapido cuando un pick esta a punto
 RUN = int(os.getenv("RUN_SECONDS", "320"))      # algo mas de 5 min: la siguiente ejecucion
@@ -1133,6 +1134,16 @@ def tick():
             lines.append(f"  🔴 {p['a']} {p['score']} {p['b']}")
         send("\n".join(lines))
 
+    # Alarma: si la fuente de datos casi no da partidos de esta liga, avisar
+    # (una vez al dia) en vez de quedarse callado como si no hubiera picks.
+    ahora = datetime.now(tt_feed.TZ)
+    if 10 <= ahora.hour < 23 and len(parsed) < MIN_PARTIDOS and \
+            state.get("aviso_pocos_datos") != ahora.strftime("%Y-%m-%d"):
+        state["aviso_pocos_datos"] = ahora.strftime("%Y-%m-%d")
+        send(f"⚠️ {LIGA}: hoy solo me llegan {len(parsed)} partidos en los datos "
+             f"(lo normal es más de 100). Puede que Sofascore haya cambiado algo.\n"
+             f"Mientras siga así NO podré avisarte de picks. Lanza 'Explorar ligas' en "
+             f"GitHub (Actions) y pásale el resultado a Claude.")
     update_results(parsed)
     read_replies(parsed, groups)
     maybe_daily_summary()
