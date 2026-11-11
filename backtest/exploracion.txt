@@ -1,11 +1,19 @@
 🔎 DIAGNÓSTICO BETSAPI
 
-1) sport_id=92: HTTP Error 401: Unauthorized
-1) sport_id=91: HTTP Error 401: Unauthorized
-1) sport_id=90: HTTP Error 401: Unauthorized
-   (no he podido confirmar el deporte por los nombres; uso 92)
+1) sport_id=92: 17 en juego · ligas: TT Cup ×5, Setka Cup ×5, Czech Liga Pro ×5, TT Elite Series ×2
    → tenis de mesa = sport_id 92
 
-2) terminados de hoy: HTTP Error 401: Unauthorized
-2) próximos de hoy: HTTP Error 401: Unauthorized
 2) Ligas de tenis de mesa HOY (número · nombre: terminados / en juego / próximos):
+   22307 · Setka Cup: 159 / 5 / 14 ◀
+   29128 · TT Elite Series: 117 / 2 / 24 ◀
+   29097 · TT Cup: 108 / 5 / 3 ◀
+   22742 · Czech Liga Pro: 93 / 5 / 11 ◀
+   47143 · WTT Contender Istanbul Quals: 10 / 0 / 0
+   47142 · WTT Contender Istanbul Quals Women: 8 / 0 / 0
+   47147 · WTT Contender Istanbul WD: 4 / 0 / 0
+   18611 · European Champions League Women: 1 / 0 / 0
+
+3) Ejemplo de partido terminado (así vienen los datos):
+   {"id": "13442667", "sport_id": "92", "time": "1794433800", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "257688", "name": "Rene Kowal", "image_id": 0, "cc": "cz"}, "away": {"id": "945080", "name": "Antonin Baros", "image_id": 0, "cc": "cz"}, "ss": "1-3", "scores": {"1": {"home": "10", "away": "12"}, "2": {"home": "11", "away": "7"}, "3": {"home": "4", "away": "11"}, "4": {"home": "7", "away": "11"}}}
+   Detalle (event/view): [{"id": "13442667", "sport_id": "92", "time": "1794433800", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "257688", "name": "Rene Kowal", "image_id": 0, "cc": "cz"}, "away": {"id": "945080", "name": "Antonin Baros", "image_id": 0, "cc": "cz"}, "ss": "1-3", "scores": {"1": {"home": "10", "away": "12"}, "2": {"home": "11", "away": "7"}, "3": {"home": "4", "away": "11"}, "4": {"home": "7", "away": "11"}}, "timeline": [{"id": "327172792", "gm": "1", "te": "1", "ss": "0-1"}, {"id": "327172805", "gm": "1", "te": "1", "ss": "0-2"}, {"id": "327172827", "gm": "1", "te": "0", "ss": "1-2"}, {"id": "327172842", "gm": "1", "te": "0", "ss": "2-2"}, {"id": "327172856", "gm": "1", "te": "0", "ss": "3-2"}, {"id": "327172866", "gm": "1", "te": "0", "ss": "4-2"}, {"id": "327172874", "gm": "1", "te": "1", "ss": "4-3"}, {"id": "327172890", "gm": "1", "te": "0", "ss": "5-3"}, {"id": "327172899", "gm": "1", "te": "0", "ss": "6-3"}, {"id": "327172902", "gm": "1", "te": "0", "ss": "7-3"}, {"id": "327172931", "gm": "1", "te": "0", "ss": "8-3"}, {"id": "327172944", "gm": "1", "te": "1", "ss": "8-4"}, {"id": "327172962", "gm": "1", "te": "0", "ss": "9-4"}, {"id": "327172977", "gm": "1", "te": "1", "ss": "9-5"}, {"id": "327172993", "gm": "1", "te": "1", "ss": "9-6"}, {"id": "327172999", "gm": "1", "te": "1", "ss": "9-7"}, {"id": "327173016", "gm": "1", "te": "1", "ss": "9-8"}, {"id": "327173022", "gm": "1", "te": "0", "ss": "10-8"}, {"id": "327173040", "gm": 
+   Ejemplo de partido EN JUEGO: {"id": "13440703", "sport_id": "92", "time": "1794432900", "time_status": "1", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "680906", "name": "Jan Vidourek", "image_id": 0, "cc": "cz"}, "away": {"id": "1337808", "name": "Simon Mezlik", "image_id": 0, "cc": null}, "ss": "0-0", "scores": {"1": {"home": "6", "away": "11"}, "2": {"home": "11", "away": "9"}, "3": {"home": "11", "away": "8"}, "4": {"home": "12", "away": "10"}}, "bet365_id": "204437499"}
