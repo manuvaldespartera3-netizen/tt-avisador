@@ -1,19 +1,31 @@
 🔎 DIAGNÓSTICO BETSAPI
 
-1) sport_id=92: 17 en juego · ligas: TT Cup ×5, Setka Cup ×5, Czech Liga Pro ×5, TT Elite Series ×2
+Token: 21 caracteres
+
+1) sport_id=92: 15 en juego · ligas: Czech Liga Pro ×6, Setka Cup ×5, TT Elite Series ×2, TT Cup ×2
    → tenis de mesa = sport_id 92
 
 2) Ligas de tenis de mesa HOY (número · nombre: terminados / en juego / próximos):
-   22307 · Setka Cup: 159 / 5 / 14 ◀
-   29128 · TT Elite Series: 117 / 2 / 24 ◀
-   29097 · TT Cup: 108 / 5 / 3 ◀
-   22742 · Czech Liga Pro: 93 / 5 / 11 ◀
-   47143 · WTT Contender Istanbul Quals: 10 / 0 / 0
+   22307 · Setka Cup: 155 / 5 / 10 ◀
+   29128 · TT Elite Series: 117 / 2 / 25 ◀
+   29097 · TT Cup: 112 / 2 / 3 ◀
+   22742 · Czech Liga Pro: 94 / 6 / 7 ◀
+   47143 · WTT Contender Istanbul Quals: 9 / 0 / 0
    47142 · WTT Contender Istanbul Quals Women: 8 / 0 / 0
    47147 · WTT Contender Istanbul WD: 4 / 0 / 0
    18611 · European Champions League Women: 1 / 0 / 0
 
 3) Ejemplo de partido terminado (así vienen los datos):
-   {"id": "13442667", "sport_id": "92", "time": "1794433800", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "257688", "name": "Rene Kowal", "image_id": 0, "cc": "cz"}, "away": {"id": "945080", "name": "Antonin Baros", "image_id": 0, "cc": "cz"}, "ss": "1-3", "scores": {"1": {"home": "10", "away": "12"}, "2": {"home": "11", "away": "7"}, "3": {"home": "4", "away": "11"}, "4": {"home": "7", "away": "11"}}}
-   Detalle (event/view): [{"id": "13442667", "sport_id": "92", "time": "1794433800", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "257688", "name": "Rene Kowal", "image_id": 0, "cc": "cz"}, "away": {"id": "945080", "name": "Antonin Baros", "image_id": 0, "cc": "cz"}, "ss": "1-3", "scores": {"1": {"home": "10", "away": "12"}, "2": {"home": "11", "away": "7"}, "3": {"home": "4", "away": "11"}, "4": {"home": "7", "away": "11"}}, "timeline": [{"id": "327172792", "gm": "1", "te": "1", "ss": "0-1"}, {"id": "327172805", "gm": "1", "te": "1", "ss": "0-2"}, {"id": "327172827", "gm": "1", "te": "0", "ss": "1-2"}, {"id": "327172842", "gm": "1", "te": "0", "ss": "2-2"}, {"id": "327172856", "gm": "1", "te": "0", "ss": "3-2"}, {"id": "327172866", "gm": "1", "te": "0", "ss": "4-2"}, {"id": "327172874", "gm": "1", "te": "1", "ss": "4-3"}, {"id": "327172890", "gm": "1", "te": "0", "ss": "5-3"}, {"id": "327172899", "gm": "1", "te": "0", "ss": "6-3"}, {"id": "327172902", "gm": "1", "te": "0", "ss": "7-3"}, {"id": "327172931", "gm": "1", "te": "0", "ss": "8-3"}, {"id": "327172944", "gm": "1", "te": "1", "ss": "8-4"}, {"id": "327172962", "gm": "1", "te": "0", "ss": "9-4"}, {"id": "327172977", "gm": "1", "te": "1", "ss": "9-5"}, {"id": "327172993", "gm": "1", "te": "1", "ss": "9-6"}, {"id": "327172999", "gm": "1", "te": "1", "ss": "9-7"}, {"id": "327173016", "gm": "1", "te": "1", "ss": "9-8"}, {"id": "327173022", "gm": "1", "te": "0", "ss": "10-8"}, {"id": "327173040", "gm": 
-   Ejemplo de partido EN JUEGO: {"id": "13440703", "sport_id": "92", "time": "1794432900", "time_status": "1", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "680906", "name": "Jan Vidourek", "image_id": 0, "cc": "cz"}, "away": {"id": "1337808", "name": "Simon Mezlik", "image_id": 0, "cc": null}, "ss": "0-0", "scores": {"1": {"home": "6", "away": "11"}, "2": {"home": "11", "away": "9"}, "3": {"home": "11", "away": "8"}, "4": {"home": "12", "away": "10"}}, "bet365_id": "204437499"}
+   {"id": "13442666", "sport_id": "92", "time": "1794435600", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "683480", "name": "David Stusek", "image_id": 0, "cc": "cz"}, "away": {"id": "684567", "name": "Petr Vicherek", "image_id": 0, "cc": "cz"}, "ss": "0-3", "scores": {"1": {"home": "11", "away": "13"}, "2": {"home": "7", "away": "11"}, "3": {"home": "6", "away": "11"}}}
+   Detalle (event/view): [{"id": "13442666", "sport_id": "92", "time": "1794435600", "time_status": "3", "league": {"id": "29097", "name": "TT Cup", "cc": "cz"}, "home": {"id": "683480", "name": "David Stusek", "image_id": 0, "cc": "cz"}, "away": {"id": "684567", "name": "Petr Vicherek", "image_id": 0, "cc": "cz"}, "ss": "0-3", "scores": {"1": {"home": "11", "away": "13"}, "2": {"home": "7", "away": "11"}, "3": {"home": "6", "away": "11"}}, "timeline": [{"id": "327175834", "gm": "1", "te": "0", "ss": "1-0"}, {"id": "327175847", "gm": "1", "te": "1", "ss": "1-1"}, {"id": "327175869", "gm": "1", "te": "1", "ss": "1-2"}, {"id": "327175887", "gm": "1", "te": "1", "ss": "1-3"}, {"id": "327175907", "gm": "1", "te": "0", "ss": "2-3"}, {"id": "327175921", "gm": "1", "te": "1", "ss": "2-4"}, {"id": "327175949", "gm": "1", "te": "1", "ss": "2-5"}, {"id": "327175966", "gm": "1", "te": "1", "ss": "2-6"}, {"id": "327175974", "gm": "1", "te": "1", "ss": "2-7"}, {"id": "327175999", "gm": "1", "te": "1", "ss": "2-8"}, {"id": "327176017", "gm": "1", "te": "0", "ss": "3-8"}, {"id": "327176032", "gm": "1", "te": "0", "ss": "4-8"}, {"id": "327176043", "gm": "1", "te": "0", "ss": "5-8"}, {"id": "327176067", "gm": "1", "te": "0", "ss": "6-8"}, {"id": "327176087", "gm": "1", "te": "0", "ss": "7-8"}, {"id": "327176107", "gm": "1", "te": "1", "ss": "7-9"}, {"id": "327176125", "gm": "1", "te": "1", "ss": "7-10"}, {"id": "327176134", "gm": "1", "te": "0", "ss": "8-10"}, {"id": "327176147", "gm": "1", "te": "0", "ss": "9-10"}, 
+   Ejemplo de partido EN JUEGO: {"id": "13436151", "sport_id": "92", "time": "1794423600", "time_status": "1", "league": {"id": "22742", "name": "Czech Liga Pro", "cc": "cz"}, "home": {"id": "994720", "name": "Viktor Vejvoda", "image_id": 0, "cc": "cz"}, "away": {"id": "341166", "name": "Milan Klement", "image_id": 0, "cc": "cz"}, "ss": "0-0", "scores": {"1": {"home": "11", "away": "8"}, "2": {"home": "10", "away": "12"}, "3": {"home": "11", "away": "8"}, "4": {"home": "5", "away": "11"}, "5": {"home": "7", "away": "11"}}, "bet365_id": "204383981"}
+
+4) PRUEBA DEL LECTOR NUEVO (lo que verá el bot con BetsAPI):
+   Liga Pro: 197 partidos (185 terminados, 5 en juego) · 20 grupos · 6 consultas · 0.8 s
+     🔴 Vondrak M. 1-0 Petr Z. (puntos set: 3)
+     🔴 Svacha O. 0-1 Nohejl 2005 V. (puntos set: 10)
+     🔴 Walek A. 1-0 Heczko D. (puntos set: 7)
+   TT Cup: 168 partidos (163 terminados, 2 en juego) · 17 grupos · 6 consultas · 6.1 s
+     🔴 Kosacky A. 1-1 Vanek P. (puntos set: 19)
+     🔴 Zeman R. 1-1 Kolbusovsky M. (puntos set: 5)
+     • 20:55 Sulc M. · Vanek P. · Kosacky A. · Kulisek M.: 5/6 jugados
