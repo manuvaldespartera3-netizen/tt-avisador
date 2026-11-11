@@ -1,8 +1,8 @@
 🔎 DIAGNÓSTICO DE DATOS (Zyla/Sofascore)
 
 1) Partidos por liga (número de torneo actual):
-   TT Cup (15005): 362 / 348 / 245  [antes de ayer / ayer / hoy]
-      torneos: TT Cup ×955
+   TT Cup (15005): 362 / 348 / 246  [antes de ayer / ayer / hoy]
+      torneos: TT Cup ×956
    Czech Liga Pro (19039): 291 / 111 / 1  [antes de ayer / ayer / hoy]
       torneos: Czech Liga Pro ×403
    TT Elite Series (19041): 500 / 195 / 0  [antes de ayer / ayer / hoy]
@@ -28,3 +28,30 @@
 
 3) Torneos que se llaman 'Liga Pro':
    (sin resultados)
+
+4) Torneos de tenis de mesa programados HOY (número · nombre):
+   ▶ 171028 · Liga Pro
+   ▶ 31462 · Liga Pro
+   ▶ 99075 · Czech Liga Pro
+   ▶ 19039 · Czech Liga Pro
+   ▶ 78888 · TT Cup
+   ▶ 15005 · TT Cup
+   ▶ 78895 · Liga Pro
+   ▶ 15006 · Liga Pro
+   ▶ 78914 · Setka Cup
+   ▶ 15004 · Setka Cup
+
+5) Búsqueda de torneos 'Liga Pro':
+   ▶ 155 · Liga Profesional de Fútbol ·  · 
+   ▶ 13475 · Copa de la Liga Profesional ·  · 
+   ▶ 18436 · Trofeo de Campeones de la Liga Profesional ·  · 
+   ▶ 15006 · Liga Pro ·  · 
+   ▶ 19039 · Czech Liga Pro ·  · 
+   ▶ 14756 · Liga Pro FIFA20 - 12 mins play ·  · 
+   ▶ 22819 · A.F. Porto Decathlon Liga Pro ·  · 
+   ▶ 16353 · Liga Pro FIFA21 - 12 mins play ·  · 
+   ▶ 31462 · Liga Pro ·  · 
+   ▶ 14770 · Liga Pro ·  · 
+
+6) TODOS los partidos de tenis de mesa de HOY, por torneo:
+   error (HTTP Error 400: Bad Request)
