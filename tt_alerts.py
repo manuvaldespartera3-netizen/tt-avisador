@@ -143,12 +143,18 @@ def send(text, reply_to=None):
 
 
 def odds_now(mid, pick_home):
-    """Cuota del pick ahora mismo segun Sofascore (o '' si no hay)."""
-    if not tt_feed.KEY:
-        return ""
+    """Cuota del pick antes del partido: Bet365 (BetsAPI) si el partido viene de
+    BetsAPI, si no Sofascore (Zyla). '' si no hay."""
     mid = tt_feed.ALIAS.get(str(mid), str(mid))
-    if mid.startswith(("s", "b")):
-        return ""                      # deducido, o de BetsAPI (id distinto al de Sofascore)
+    if mid.startswith("b"):
+        try:
+            o = tt_feed.tt_betsapi.cuota_prepartido(mid)
+        except Exception as ex:
+            print("WARN odds BetsAPI", ex)
+            return ""
+        return f"{(o[0] if pick_home else o[1]):.2f}" if o else ""
+    if not tt_feed.KEY or mid.startswith("s"):
+        return ""                      # sin Zyla, o partido deducido (sin id real)
     try:
         data = tt_feed._call(URL_ODDS, match_id=mid)
     except Exception as ex:
@@ -641,12 +647,72 @@ def update_results(parsed):
             pk["marcador"] = f"{sa}-{sb}" if pick_home else f"{sb}-{sa}"
             if pk.get("tipo") == "OFICIAL" and not pk.get("cuota_cierre"):
                 pk["cuota_cierre"] = odds_now(pk["match_id"], pick_home)
+                if not pk.get("cuota_aviso"):
+                    pk["cuota_aviso"] = pk["cuota_cierre"]
             changed = True
         elif ev["status"] not in ("notstarted", "inprogress"):
             pk["resultado"] = "N"          # cancelado / no jugado
             changed = True
+    # picks de BetsAPI ya resueltos sin cuota de la casa (de antes de este cambio):
+    # se completan poco a poco (como mucho 3 por vuelta)
+    hechos = 0
+    for pk in picks:
+        if hechos >= 3:
+            break
+        if (pk.get("tipo") == "OFICIAL" and pk.get("resultado") in ("G", "P")
+                and str(pk.get("match_id", "")).startswith("b") and not pk.get("cuota_cierre")
+                and not pk.get("_sin_cuota")):
+            hechos += 1
+            ev = by_id.get(pk["match_id"])
+            if ev:
+                ph = pk["pick"] == ev["a"]
+            else:                                   # partido de otro dia: se lee aparte
+                e2 = tt_feed.event(pk["match_id"])
+                if not e2:
+                    pk["_sin_cuota"] = 1
+                    continue
+                ph = pk["pick"] == (e2.get("homeTeam") or {}).get("name")
+            c = odds_now(pk["match_id"], ph)
+            if c:
+                pk["cuota_cierre"] = c
+                pk["cuota_aviso"] = pk.get("cuota_aviso") or c
+                changed = True
+            else:
+                pk["_sin_cuota"] = 1
     if changed:
         save_picks()
+
+
+def unidades(rows, campo):
+    """(n, unidades, sin_cuota): 1 u por pick con la cuota de ese campo."""
+    n = sin = 0
+    u = 0.0
+    for p in rows:
+        if p.get("resultado") not in ("G", "P"):
+            continue
+        try:
+            c = float(str(p.get(campo) or "").replace(",", "."))
+        except ValueError:
+            c = 0
+        if campo == "cuota_casa":
+            try:
+                c = float(p.get("cuota_aviso") or p.get("cuota_cierre") or 0)
+            except ValueError:
+                c = 0
+        if c <= 1:
+            sin += 1
+            continue
+        n += 1
+        u += (c - 1) if p["resultado"] == "G" else -1
+    return n, u, sin
+
+
+def u_line(label, rows, campo):
+    n, u, sin = unidades(rows, campo)
+    extra = f" ({sin} sin cuota)" if sin else ""
+    if not n:
+        return f"{label}: sin cuotas{extra}"
+    return f"{label}: {n} picks · {u:+.2f} u · yield {100 * u / n:+.1f}%{extra}"
 
 
 def _stats(rows):
@@ -691,6 +757,12 @@ def summary_text(today):
     lines.append(_line("  🔵 OFICIAL B", [p for p in calla if p.get("tipo") == "OFICIAL B"]))
     lines.append(_line("  🟡 POTENCIAL", [p for p in calla if p.get("tipo") == "POTENCIAL"]))
     lines.append(_line("  🌙 oficial noche", [p for p in calla if p.get("calidad") == "noche"]))
+    lines.append("")
+    lines.append("📈 EN UNIDADES (1 u por pick)")
+    lines.append(u_line("  Hoy · tus cuotas", hoy, "cuota"))
+    lines.append(u_line("  Hoy · cuota de la casa", hoy, "cuota_casa"))
+    lines.append(u_line("  Total · tus cuotas", env, "cuota"))
+    lines.append(u_line("  Total · cuota de la casa", env, "cuota_casa"))
     lines.append("")
     lines.append("💶 TU DINERO (cuotas que has apuntado)")
     lines.append(euro_line("  Hoy", hoy))

@@ -183,3 +183,21 @@ def evento(mid):
     d = api("/v1/event/view", event_id=str(mid).lstrip("b"))
     res = d.get("results") or []
     return _sin_retroceso(convertir(res[0])) if res else None
+
+
+def cuota_prepartido(mid):
+    """(local, visitante): la ultima cuota a ganador de Bet365 ANTES de empezar el
+    partido (las de en directo no cuentan). None si no hay."""
+    d = api("/v2/event/odds", event_id=str(mid).lstrip("b"), odds_market=1)
+    lista = ((d.get("results") or {}).get("odds") or {}).get("92_1") or []
+    mejor = None
+    for o in lista:
+        if o.get("ss"):                       # tiene marcador: es cuota en directo
+            continue
+        try:
+            h, a, t = float(o["home_od"]), float(o["away_od"]), int(o.get("add_time") or 0)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if h > 1 and a > 1 and (mejor is None or t > mejor[2]):
+            mejor = (h, a, t)
+    return (mejor[0], mejor[1]) if mejor else None
