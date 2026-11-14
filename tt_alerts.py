@@ -778,6 +778,53 @@ def summary_text(today):
     return "\n".join(lines)
 
 
+# ------------------------------------------- vigilante de los otros bots
+VIGILAR = os.getenv("VIGILAR", "").strip()          # p. ej. "usuario/tt-multiliga"
+VIGILADOS = [("seguimiento/estado.json", "Seguimiento TT Cup y Elite", "Seguimiento TT Cup"),
+             ("seguimiento/rating_estado.json", "Rating Liga Pro", "Rating Liga Pro en vivo")]
+VIGIA_MIN = int(os.getenv("VIGIA_MIN", "40"))       # minutos sin dar señales -> aviso
+
+
+def vigilar_otros():
+    """Cada 10 min mira cuando guardaron por ultima vez los bots de tt-multiliga.
+    Si alguno lleva mas de VIGIA_MIN minutos callado, avisa (una vez) y avisa
+    tambien cuando vuelve. Nunca para este avisador si algo falla."""
+    if not VIGILAR or time.time() - state.get("vigia_ts", 0) < 600:
+        return
+    state["vigia_ts"] = time.time()
+    alertas = state.setdefault("vigia_alerta", {})
+    cab = {"User-Agent": "tt-avisador", "Accept": "application/vnd.github+json"}
+    if os.getenv("GH_TOKEN"):
+        cab["Authorization"] = f"Bearer {os.getenv('GH_TOKEN')}"
+    for path, nombre, workflow in VIGILADOS:
+        try:
+            url = (f"https://api.github.com/repos/{VIGILAR}/commits?"
+                   + urllib.parse.urlencode({"path": path, "per_page": 1}))
+            try:
+                with urllib.request.urlopen(urllib.request.Request(url, headers=cab), timeout=20) as r:
+                    d = json.loads(r.read().decode())
+            except urllib.error.HTTPError as ex:
+                if ex.code not in (401, 403) or "Authorization" not in cab:
+                    raise
+                cab.pop("Authorization")              # el token no vale aqui: sin token
+                with urllib.request.urlopen(urllib.request.Request(url, headers=cab), timeout=20) as r:
+                    d = json.loads(r.read().decode())
+            fecha = d[0]["commit"]["committer"]["date"]
+            ult = datetime.fromisoformat(fecha.replace("Z", "+00:00")).timestamp()
+        except Exception as ex:
+            print("WARN vigia", nombre, ex)
+            continue
+        mins = (time.time() - ult) / 60
+        if mins > VIGIA_MIN and not alertas.get(path):
+            alertas[path] = True
+            send(f"⚠️ El bot {nombre} lleva {mins:.0f} min sin dar señales (puede estar parado).\n"
+                 f"Arráncalo: {VIGILAR.split('/')[-1]} → Actions → {workflow} → Run workflow.\n"
+                 "Las cuotas que le mandes mientras tanto no se pierden: las lee al volver.")
+        elif mins <= VIGIA_MIN and alertas.get(path):
+            alertas[path] = False
+            send(f"✅ El bot {nombre} vuelve a funcionar.")
+
+
 def maybe_daily_summary():
     now = datetime.now(tt_feed.TZ)
     today = now.strftime("%Y-%m-%d")
@@ -1223,6 +1270,10 @@ def tick():
     update_results(parsed)
     read_replies(parsed, groups)
     maybe_daily_summary()
+    try:
+        vigilar_otros()
+    except Exception as ex:                      # nunca debe afectar a los avisos
+        print("WARN vigia", ex)
 
     sent = set(state["sent"])
 
