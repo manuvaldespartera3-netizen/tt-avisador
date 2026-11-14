@@ -40,6 +40,9 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
           TEST_MODE: ${{ vars.TEST_MODE || '1' }}
+          # vigila que los bots de tt-multiliga sigan vivos (te avisa si se paran)
+          VIGILAR: "manuvaldespartera3-netizen/tt-multiliga"
+          GH_TOKEN: ${{ github.token }}
         run: python tt_alerts.py
 
       - name: Guardar memoria
