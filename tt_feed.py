@@ -11,7 +11,7 @@ import os
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
-from itertools import combinations
+from itertools import combinations, product
 
 import tt_betsapi
 from tt_engine import Group, Match
@@ -438,6 +438,7 @@ def build_groups(events):
     parsed.sort(key=lambda x: (x["t"], x["id"]))
     W = WINDOW_H * 3600
     used, groups = set(), []
+    hechos = []                    # (jugadores, hora del ultimo partido) de los grupos ya formados
     for m in parsed:
         if m["id"] in used:
             continue
@@ -449,22 +450,47 @@ def build_groups(events):
         near -= {a, b}
         found = None
         for c, d in combinations(sorted(near), 2):
-            four, ms = (a, b, c, d), []
+            four, opciones = (a, b, c, d), []
             for p, q in combinations(four, 2):
-                if {p, q} == {a, b}:
-                    ms.append(m)
-                    continue
                 cand = [x for x in pool if {x["a"], x["b"]} == {p, q}]
                 if not cand:
                     break
-                ms.append(min(cand, key=lambda x: x["t"]))   # el primero = de grupo
-            if len(ms) == 6:
-                found = (four, ms)
+                opciones.append(sorted(cand, key=lambda x: x["t"])[:3])
+            if len(opciones) == 6:
+                # Si dos jugadores se enfrentan mas de una vez (partido extra o
+                # "final" de otro grupo), se elige la combinacion de 6 partidos en la
+                # que NO queda en medio ningun otro partido entre esos 4 jugadores
+                # (un grupo de verdad no tiene repetidos dentro), luego la de ritmo
+                # mas regular, luego la que no usa la "final" de un grupo anterior, y
+                # si aun empatan, la que empieza antes (como siempre).
+                entre4 = [x for x in pool if x["a"] in four and x["b"] in four]
+
+                def intrusos(c6):
+                    ids = {x["id"] for x in c6}
+                    t0, t1 = min(x["t"] for x in c6), max(x["t"] for x in c6)
+                    return sum(1 for x in entre4 if x["id"] not in ids and t0 < x["t"] < t1)
+                def irregular(c6):
+                    # un grupo de verdad va a ritmo fijo (un partido cada ~30 min):
+                    # diferencia entre el hueco mas largo y el mas corto, en tramos de 5 min
+                    ts = sorted(x["t"] for x in c6)
+                    gaps = [b - a for a, b in zip(ts, ts[1:])]
+                    return (max(gaps) - min(gaps)) // 300
+                def finales(c6):
+                    # partidos que parecen la "final" de un grupo ya formado: los dos
+                    # jugadores estaban juntos en un grupo que acabo hace 1 h o menos
+                    # (las finales se juegan justo despues de su grupo)
+                    return sum(1 for x in c6 for jug, fin in hechos
+                               if x["a"] in jug and x["b"] in jug and 0 < x["t"] - fin <= 3600)
+                ms = min(product(*opciones),
+                         key=lambda c6: (intrusos(c6), irregular(c6), finales(c6),
+                                         min(x["t"] for x in c6), max(x["t"] for x in c6)))
+                found = (four, list(ms))
                 break
         if not found:
             continue
         four, ms = found
         used |= {x["id"] for x in ms}
+        hechos.append((set(four), max(x["t"] for x in ms)))
         ms.sort(key=lambda x: x["t"])
         matches = [Match(x["a"], x["b"], i + 1,
                          time=datetime.fromtimestamp(x["t"], TZ).strftime("%H:%M")
