@@ -513,6 +513,14 @@ def build_groups(events):
                 if p_ in four and q_ not in four:
                     rivales.setdefault(q_, set()).add(p_)
         grp.quinto = next((q_ for q_, v in rivales.items() if len(v) >= 3), None)
+        # Ademas: un jugador no puede jugar otro torneo EN MEDIO del suyo. Si alguno
+        # de los 4 juega contra alguien de fuera dentro del horario de este grupo,
+        # el grupo no es de 4 (o esta mal formado): sin picks, por seguridad.
+        if not grp.quinto:
+            for x in parsed:
+                if t_ini < x["t"] < t_fin and (x["a"] in four) != (x["b"] in four):
+                    grp.quinto = x["b"] if x["a"] in four else x["a"]
+                    break
         if grp.quinto:
             grp.dudoso = True
         groups.append(grp)
