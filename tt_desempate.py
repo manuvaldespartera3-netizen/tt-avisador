@@ -15,7 +15,10 @@ directo en las de "mini-liga"):
   MINI_DIF   mini-liga entre los empatados con DIFERENCIA de sets y luego
              diferencia de puntos (en vez de cociente)
   TOTAL      cociente de sets de todo el grupo, luego de puntos
-Variables: TT_TOURNAMENT_ID (19039 = Liga Pro), TELEGRAM_TOKEN, MY_CHAT_ID
+Si no hay historico guardado, descarga de BetsAPI los ultimos DIAS dias
+(unas 6 consultas por dia).
+Variables: TT_TOURNAMENT_ID (19039 = Liga Pro), BETSAPI_TOKEN, DIAS (60),
+           TELEGRAM_TOKEN, MY_CHAT_ID
 """
 import json
 import os
@@ -26,6 +29,32 @@ from tt_feed import parse, TZ
 from tt_backtest import build_groups_fast, has_fifth, tg_text, LIGA, OUT, CACHE
 
 REGLAS = ["BOT_LP", "ITTF", "MINI_DIF", "TOTAL"]
+
+
+DIAS = int(os.getenv("DIAS", "60"))
+
+
+def bajar_betsapi():
+    """Sin historico guardado: los partidos terminados de BetsAPI (dias UTC)."""
+    import tt_betsapi as B
+    from tt_feed import TOURNAMENT_ID
+    from datetime import datetime, timedelta, timezone
+    if not B.TOKEN:
+        return [], "sin BETSAPI_TOKEN"
+    liga = B.LIGAS.get(str(TOURNAMENT_ID), str(TOURNAMENT_ID))
+    hoy = datetime.now(timezone.utc).date()
+    evs = {}
+    fallos = 0
+    for k in range(DIAS, 0, -1):
+        dd = (hoy - timedelta(days=k)).strftime("%Y%m%d")
+        try:
+            for e in B._paginas("/v3/events/ended", sport_id=B.SPORT, league_id=liga, day=dd):
+                evs[str(e.get("id"))] = e
+        except Exception as ex:
+            fallos += 1
+            print("WARN dia", dd, ex)
+    conv = [B.convertir(e) for e in evs.values()]
+    return conv, f"BetsAPI, {DIAS} días ({B.LLAMADAS[0]} consultas, {fallos} días con error)"
 
 
 def cargar():
@@ -118,9 +147,15 @@ def top2(tiers):
 def main():
     parsed = cargar()
     L = [f"⚖️ ¿QUÉ DESEMPATE USA DE VERDAD {LIGA.upper()}?", ""]
+    origen = "histórico guardado"
     if not parsed:
-        L.append("❌ No encuentro el histórico descargado (cache del backtest).")
+        evs, origen = bajar_betsapi()
+        parsed = sorted([p for p in (parse(e) for e in evs) if p and p["final"]],
+                        key=lambda x: (x["t"], x["id"]))
+    if not parsed:
+        L.append(f"❌ No hay datos ({origen}).")
         return fin(L)
+    L.append(f"Datos: {origen} · {len(parsed)} partidos")
     groups = build_groups_fast(parsed)
     by_t = parsed
     st = {r: [0, 0] for r in REGLAS}            # aciertos, casos decididos
