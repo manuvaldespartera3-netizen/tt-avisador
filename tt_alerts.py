@@ -982,7 +982,9 @@ def _pts_scan(r, g, pm, f):
             out.add(_pick_with_points(r, g, pm, f, pa, pb))
             if len(out) == 2:
                 return "dependerá de los puntos (te digo en el último set)"
-    return "si" if out == {True} else "no"
+    # todas las pruebas dicen pick, pero son una MUESTRA de marcadores (faltan
+    # varios sets): no es seguro hasta saber los puntos reales
+    return "casi" if out == {True} else "no"
 
 
 def outcome(r, g, pm, f):
@@ -996,6 +998,8 @@ def outcome(r, g, pm, f):
         sc = pts_scan(r, g, pm, f)
         if sc == "si":
             r2 = dict(r, warn=False)
+        elif sc == "casi":
+            return "⚖️", "lo deciden los puntos (pinta a pick): te confirmo al acabar"
         elif sc != "no":
             return "⚖️", sc
         else:
