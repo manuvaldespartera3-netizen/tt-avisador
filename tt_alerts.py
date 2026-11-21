@@ -939,57 +939,114 @@ def pts_scan(r, g, pm, f):
     return _SCAN[key]
 
 
+def _sumas(n_win, n_lose, exhaustivo):
+    """Puntos (del que gana el partido, del que lo pierde) posibles en n_win sets
+    ganados + n_lose perdidos. Sin repetir sumas (lo que decide son las sumas)."""
+    if exhaustivo:
+        opts = SET_SCORES
+    else:
+        opts = [(11, 0), (11, 3), (11, 6), (11, 8), (11, 9), (12, 10), (14, 12), (16, 14)]
+    sumas = {(0, 0)}
+    for _ in range(n_win):
+        sumas = {(a + w, b + l) for a, b in sumas for w, l in opts}
+    for _ in range(n_lose):
+        sumas = {(a + l, b + w) for a, b in sumas for w, l in opts}
+    return sumas
+
+
+def _empate_txt(r, g, pm, f):
+    """Quien empataria y que lo decide (para explicar el ❓)."""
+    m = r["match"]
+    ms = []
+    for x in g.matches:
+        if x is pm:
+            ms.append(Match(x.a, x.b, x.order, final=f))
+        elif x is m:
+            ms.append(Match(x.a, x.b, x.order, final=(3, 1) if r["pick"] == x.a else (1, 3)))
+        else:
+            ms.append(x if x.final else Match(x.a, x.b, x.order, final=(3, 1)))
+    res = {frozenset((x.a, x.b)): (x.a, x.b, x.final[0], x.final[1],
+                                   *(x.points if (x.points and x is not pm and x is not m)
+                                     else (None, None))) for x in ms}
+    from tt_engine import _rank, TIEBREAK
+    pos = 0
+    for t in _rank(g.players, res):
+        if len(t) > 1 and pos < 2 < pos + len(t):
+            nombres = ", ".join(p.split()[0] for p in t[:-1]) + " y " + t[-1].split()[0]
+            if TIEBREAK == "ligapro":
+                regla = "decide la diferencia de puntos en TODO el grupo"
+            else:
+                regla = "decide el cociente de puntos en los partidos entre ellos"
+            return f"empatarían {nombres} en victorias y en sets: {regla}"
+        pos += len(t)
+    return "lo decide el desempate por puntos"
+
+
 def _pts_scan(r, g, pm, f):
+    """El pick depende de los PUNTOS del partido 'pm' si acaba 'f'. Prueba todas
+    las sumas de puntos posibles y lo resume en una condicion clara sobre la
+    DIFERENCIA de puntos del partido (sumando todos sus sets).
+    Devuelve 'si', 'no' o el texto de la condicion."""
     done = getattr(pm, "done_pts", None) or (0, 0)
     la, lb = pm.live if pm.live else (0, 0)
     left_a, left_b = f[0] - la, f[1] - lb          # sets que faltan a cada uno
     if left_a < 0 or left_b < 0 or left_a + left_b < 1:
         return "no"
     win_a = f[0] > f[1]
-    wname = pm.a if win_a else pm.b
-    if left_a + left_b == 1:
-        # solo falta UN set: se prueban todos sus marcadores
-        res = []
-        for w, l in SET_SCORES:
-            pa = done[0] + (w if win_a else l)
-            pb = done[1] + (l if win_a else w)
-            res.append(((w, l), _pick_with_points(r, g, pm, f, pa, pb)))
-        ok = [sc for sc, v in res if v]
-        if len(ok) == len(res):
-            return "si"
-        if not ok:
-            return "no"
-        amplio = [sc for sc in ok if sc[0] == 11]
-        if ok == [sc for sc, _ in res][:len(ok)]:
-            u = ok[-1]
-            return f"PICK si {wname} gana el set {u[0]}-{u[1]} o más amplio"
-        if ok == [sc for sc, _ in res][-len(ok):]:
-            u = ok[0]
-            return f"PICK si {wname} gana el set ajustado: {u[0]}-{u[1]} o más reñido"
-        return "depende de los puntos exactos del set"
-    # faltan varios sets: se prueban muchas combinaciones de marcadores de esos sets
-    from itertools import product as _prod
+    wname = (pm.a if win_a else pm.b).split()[0]
     wl, ll = (left_a, left_b) if win_a else (left_b, left_a)
-    # con muchos sets por jugar se usan menos marcadores (si no, tarda demasiado)
-    opts = [(11, 0), (11, 6), (11, 9), (16, 14)] if wl + ll <= 3 else [(11, 0), (11, 9), (16, 14)]
-    out = set()
-    for wins in _prod(opts, repeat=wl):
-        for losses in _prod(opts, repeat=ll):
-            pw = sum(x for x, _ in wins) + sum(y for _, y in losses)
-            pl = sum(y for _, y in wins) + sum(x for x, _ in losses)
-            pa = done[0] + (pw if win_a else pl)
-            pb = done[1] + (pl if win_a else pw)
-            out.add(_pick_with_points(r, g, pm, f, pa, pb))
-            if len(out) == 2:
-                return "dependerá de los puntos (te digo en el último set)"
-    # todas las pruebas dicen pick, pero son una MUESTRA de marcadores (faltan
-    # varios sets): no es seguro hasta saber los puntos reales
-    return "casi" if out == {True} else "no"
+    dw, dl = (done if win_a else (done[1], done[0]))   # puntos ya jugados (ganador, perdedor)
+    por_dif = {}
+    for pw, pl in _sumas(wl, ll, exhaustivo=True):
+        tw, tl = dw + pw, dl + pl
+        pa, pb = (tw, tl) if win_a else (tl, tw)
+        por_dif.setdefault(tw - tl, set()).add(_pick_with_points(r, g, pm, f, pa, pb))
+    todos = set().union(*por_dif.values())
+    if todos == {True}:
+        return "si"
+    if todos == {False}:
+        return "no"
+    expl = _empate_txt(r, g, pm, f)
+    difs = sorted(por_dif)
+    lname, wfull = (pm.b if win_a else pm.a).split()[0], wname
+    quien = f"la diferencia de puntos del partido ({wfull} − {lname}, sumando todos los sets)"
+    ok = [d for d in difs if por_dif[d] == {True}]
+    no = [d for d in difs if por_dif[d] == {False}]
+    mixto = [d for d in difs if len(por_dif[d]) == 2]
+
+    def tramos(vals):
+        """[3,4,5,9,10] -> 'entre 3 y 5, o bien 9 o más' usando los extremos posibles."""
+        out, ini = [], None
+        for i, d in enumerate(difs):
+            dentro = d in vals
+            if dentro and ini is None:
+                ini = d
+            if ini is not None and (not dentro or i == len(difs) - 1):
+                fin = d if dentro else difs[i - 1]
+                if ini == fin:
+                    out.append(f"exactamente {ini}")
+                elif fin == difs[-1]:
+                    out.append(f"{ini} o más")
+                elif ini == difs[0]:
+                    out.append(f"{fin} o menos")
+                else:
+                    out.append(f"entre {ini} y {fin}")
+                ini = None
+        return ", o bien ".join(out)
+    if not ok:
+        return (f"PICK solo con algunos marcadores exactos · {expl} · te confirmo al acabar")
+    if not mixto and len(no) <= 3 and len(tramos(no).split(", o bien ")) <= len(tramos(ok).split(", o bien ")):
+        cond = f"PICK salvo que {quien} sea {tramos(no)}"
+    else:
+        cond = f"PICK si {quien} es {tramos(ok)}"
+        if mixto:
+            cond += f"; si es {tramos(mixto)}, depende de los puntos exactos (te confirmo al acabar)"
+    return f"{cond} · {expl}"
 
 
 def outcome(r, g, pm, f):
     """Que pasa con el pick si el partido decisivo 'pm' acaba exactamente 'f'.
-    Devuelve (simbolo, texto corto). ⚖️ = depende de los puntos de ese partido."""
+    Devuelve (simbolo, texto). ❓ = pick solo con una condicion de puntos (el texto la dice)."""
     m = r["match"]
     if kind(r) != "OFICIAL":
         return "❌", "solo potencial"
@@ -998,10 +1055,8 @@ def outcome(r, g, pm, f):
         sc = pts_scan(r, g, pm, f)
         if sc == "si":
             r2 = dict(r, warn=False)
-        elif sc == "casi":
-            return "⚖️", "lo deciden los puntos (pinta a pick): te confirmo al acabar"
         elif sc != "no":
-            return "⚖️", sc
+            return "❓", sc
         else:
             r3 = g._eval_match(m, {pm.order: [f]})
             return "❌", ("lo deciden los puntos" if r3 and r3["pick"] == r["pick"]
@@ -1051,11 +1106,11 @@ def early_table(g, p0, p1, m, pick, vs):
                 else:
                     sym = "✅"
             else:
-                # ¿no hay pick seguro solo porque lo deciden los puntos? -> ⚖️
+                # ¿no hay pick seguro solo porque lo deciden los puntos? -> ❓
                 sts = [st for _, st in g.completions({p0.order: [f0], p1.order: [f1]})]
                 dudoso = any(st.get(pick) == "A" or st.get(vs) == "A" for st in sts)
                 rival_fuera = all(st.get(vs) in ("O", "A") for st in sts)
-                sym = "⚖️" if dudoso and rival_fuera else "❌"
+                sym = "❓" if dudoso and rival_fuera else "❌"
             fila.append((f1, sym))
         tab[f0] = fila
     # se avisa si con algun resultado del 1.er partido hay pick en la mitad o mas
@@ -1082,12 +1137,15 @@ def early_text(tab, m, pick, vs, p0, p1):
         else:
             lines.append(f"• {head} → " + " ".join(
                 f"{nom(p1.a if f[0] > f[1] else p1.b)}{max(f)}-{min(f)}{x}" for f, x in fila))
+    if any(x == "❓" for fila in tab.values() for _, x in fila):
+        lines.append("❓ = pick solo según los puntos: cuando se acerque te digo cuántos hacen falta")
     lines.append("Aún NO apuestes: te voy concretando según acaben.")
     return "\n".join(lines)
 
 
 def preview_text(r, pm, g):
-    """PREAVISO: posible pick y que tiene que pasar en el partido del que depende."""
+    """PREAVISO: posible pick y, para CADA resultado del partido del que depende,
+    si es pick seguro, pick solo con una condicion de puntos (dicha en numeros) o no."""
     m = r["match"]
     when = f" ({pm.time})" if pm.time else ""
     if pm.live:
@@ -1099,17 +1157,29 @@ def preview_text(r, pm, g):
                if (f[0] > f[1]) == (p == pm.a)]
         if not res:
             continue
-        syms = {o[0] for _, o in res}
-        if syms == {"✅"}:
-            lines.append(f"✅ Si gana {p} (cualquier resultado) → {res[0][1][1]}")
-        elif syms == {"❌"}:
-            lines.append(f"❌ Si gana {p} → no hay pick")
-        else:
-            lines.append(f"Si gana {p}: " + " · ".join(
-                f"{o[0]} {max(f)}-{min(f)}" for f, o in res))
-    if any(o[0] == "⚖️" for f in pm.possible_finals() for o in [outcome(r, g, pm, f)]):
-        lines.append("⚖️ = depende de los puntos: te lo concreto en el set decisivo")
-    lines.append("Aún NO apuestes: te confirmo en cuanto acabe ese partido.")
+        nom = p.split()[0]
+        si = [f for f, o in res if o[0] == "✅"]
+        no = [f for f, o in res if o[0] == "❌"]
+        cond = [(f, o[1]) for f, o in res if o[0] == "❓"]
+        def marc(fs):
+            return " o ".join(f"{max(f)}-{min(f)}" for f in fs)
+        if len(si) == len(res):
+            lines.append(f"✅ Gana {nom} (cualquier resultado) → {res[0][1][1]}")
+            continue
+        if len(no) == len(res):
+            lines.append(f"❌ Gana {nom} → no hay pick")
+            continue
+        if si:
+            txt = next(o[1] for f, o in res if o[0] == "✅")
+            lines.append(f"✅ {nom} gana {marc(si)} → {txt}")
+        for f, txt in cond:
+            cond_, _, expl = txt.partition(" · ")
+            lines.append(f"❓ {nom} gana {max(f)}-{min(f)} → {cond_}")
+            if expl:
+                lines.append(f"   ({expl})")
+        if no:
+            lines.append(f"❌ {nom} gana {marc(no)} → no hay pick")
+    lines.append("Aún NO apuestes: te confirmo en cuanto acabe ese partido (con los puntos reales).")
     return "\n".join(lines)
 
 
@@ -1131,8 +1201,8 @@ def closing_set_text(r, pm, g):
         if sym == "✅":
             lines.append(f"✅ Si gana {p} ({res}) → {txt.replace('pick', 'PICK OFICIAL ' + r['pick'].upper())}"
                          f" · apuesta YA")
-        elif sym == "⚖️":
-            lines.append(f"⚖️ Si gana {p} ({res}) → {txt.replace('PICK', 'PICK OFICIAL ' + r['pick'].upper())}"
+        elif sym == "❓":
+            lines.append(f"❓ Si gana {p} ({res}) → {txt.replace('PICK', 'PICK OFICIAL ' + r['pick'].upper())}"
                          f" · espera: te confirmo al acabar")
         else:
             lines.append(f"❌ Si gana {p} ({res}) → NO apuestes ({txt})")
@@ -1290,11 +1360,11 @@ def tick():
 
     def cond_alert(r, m, pm, g):
         """Avisos de un pick que depende del partido 'pm': preaviso, ATENTO y 🔔.
-        Solo si con algun resultado de 'pm' sale un pick APOSTABLE (✅ o ⚖️)."""
+        Solo si con algun resultado de 'pm' sale un pick APOSTABLE (✅ o ❓)."""
         if pm.final or len(g.pending()) > 3:
             return      # grupo aun al principio: no hay picks posibles y saldria carisimo
         outs = {f: outcome(r, g, pm, f) for f in pm.possible_finals()}
-        if not any(o[0] in ("✅", "⚖️") for o in outs.values()):
+        if not any(o[0] in ("✅", "❓") for o in outs.values()):
             return
         akey = f"{m.mid}|{r['pick']}"
         if pm.live is not None:
@@ -1437,7 +1507,7 @@ def tick():
                               reason=al.get("reason", f"{al['vs']} ya eliminado"),
                               warn=False, conds=[(px, "")])
                     outs = [outcome(rx, gx, px, f)[0] for f in px.possible_finals()]
-                    if "✅" in outs or "⚖️" in outs:
+                    if "✅" in outs or "❓" in outs:
                         al["ts"] = time.time()
                         if px.live and max(px.live) == 2:
                             once(f"F|{mid_pick}|{al['pick']}|{px.mid}|{px.live[0]}-{px.live[1]}",
