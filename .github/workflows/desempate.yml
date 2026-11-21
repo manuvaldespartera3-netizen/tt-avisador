@@ -1,0 +1,58 @@
+name: Comprobar desempate
+
+# Mira con los partidos ya descargados (no descarga nada) que regla de desempate
+# usa de verdad la liga, comparando con quien jugo la final en cada grupo.
+on:
+  workflow_dispatch:
+    inputs:
+      liga:
+        description: "Liga"
+        type: choice
+        default: "Czech Liga Pro"
+        options:
+          - "Czech Liga Pro"
+          - "TT Cup"
+
+permissions:
+  contents: write
+
+jobs:
+  comprobar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Elegir liga
+        run: |
+          case "${{ github.event.inputs.liga }}" in
+            "TT Cup") echo "TT_TOURNAMENT_ID=15005" >> $GITHUB_ENV ;;
+            *)        echo "TT_TOURNAMENT_ID=19039" >> $GITHUB_ENV ;;
+          esac
+
+      - name: Recuperar el historico descargado
+        uses: actions/cache/restore@v4
+        with:
+          path: backtest/**/cache
+          key: bt-${{ env.TT_TOURNAMENT_ID }}-desempate-${{ github.run_id }}
+          restore-keys: bt-${{ env.TT_TOURNAMENT_ID }}-
+
+      - name: Comprobar
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
+        run: python tt_desempate.py
+
+      - name: Guardar resultado
+        if: always()
+        run: |
+          git config user.name "tt-avisador"
+          git config user.email "tt-avisador@users.noreply.github.com"
+          git add backtest/desempate.txt backtest/*/desempate.txt 2>/dev/null || true
+          git commit -m "Comprobar desempate" || exit 0
+          git pull --rebase || true
+          git push || true
