@@ -46,6 +46,8 @@ jobs:
           # datos de BetsAPI (si BetsAPI falla mas de 10 min, vuelve solo a Zyla)
           FUENTE_DATOS: "betsapi"
           BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}
+          # sin filtro de noche: todos los OFICIALES se avisan a cualquier hora
+          FILTRO_NOCHE: "0"
         run: python tt_alerts.py
 
       - name: Guardar memoria
