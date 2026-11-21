@@ -1,7 +1,7 @@
 name: Comprobar desempate
 
-# Mira con los partidos ya descargados (no descarga nada) que regla de desempate
-# usa de verdad la liga, comparando con quien jugo la final en cada grupo.
+# Mira que regla de desempate usa de verdad la liga, comparando con quien jugo la
+# final en cada grupo. Usa el historico guardado; si no hay, baja 60 dias de BetsAPI.
 on:
   workflow_dispatch:
     inputs:
@@ -19,7 +19,7 @@ permissions:
 jobs:
   comprobar:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -43,6 +43,8 @@ jobs:
 
       - name: Comprobar
         env:
+          BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}
+          DIAS: "60"
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           MY_CHAT_ID: ${{ secrets.MY_CHAT_ID }}
         run: python tt_desempate.py
