@@ -60,6 +60,7 @@ jobs:
           TEST_MODE: "0"
           TT_TOURNAMENT_ID: "19039"
           TT_TIEBREAK: "ligapro"
+          GRUPOS5: "1"
           ESTRELLAS: "0"
           FILTRO_NOCHE: "0"
           CUOTA_NORMAL: "1.60"
@@ -93,3 +94,5 @@ jobs:
               sleep 5
             done
           fi
+
+ 
