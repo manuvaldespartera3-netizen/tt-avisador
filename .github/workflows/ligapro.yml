@@ -11,7 +11,9 @@ name: Liga Pro seguimiento
 #    quitárselos al bot de TT Cup).
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # el bot va encadenado (cada ejecucion deja lista la siguiente); esto es
+    # solo de reserva por si la cadena se cortara
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -20,15 +22,23 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write          # para dejar en cola la siguiente ejecucion
 
 jobs:
   seguir:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 70     # cada ejecucion vigila ~55 min seguidos
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
+
+      # BOT SIEMPRE DESPIERTO: nada mas empezar deja en cola la siguiente
+      # ejecucion, que arranca en cuanto acaba esta (solo ~1 min de hueco por hora)
+      - name: Dejar lista la siguiente ejecucion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ligapro.yml --ref main -R "${{ github.repository }}" || echo "no se pudo encolar (la reserva cada 30 min lo cubre)"
 
       - uses: actions/setup-python@v5
         with:
@@ -69,7 +79,7 @@ jobs:
           PICKS_FILE: datos/picks_ligapro.csv
           POLL_SECONDS: "60"
           POLL_FAST: "15"
-          RUN_SECONDS: "290"
+          RUN_SECONDS: "3300"
         run: python tt_alerts.py
 
       - name: Guardar memoria Liga Pro
@@ -96,3 +106,4 @@ jobs:
           fi
 
  
+
