@@ -31,6 +31,15 @@ _ENJUEGO = {}                                 # liga -> ids vistos en juego aun 
 _VISTO = {}                                   # id -> ultimo estado conocido (no retrocede)
 _RANGO = {"notstarted": 0, "canceled": 0, "inprogress": 1, "finished": 2}
 LLAMADAS = [0]                                # contador (para vigilar el limite por hora)
+_HORAS = []                                   # hora de cada consulta (ultima hora)
+
+
+def llamadas_hora():
+    """Consultas hechas por ESTE bot en la ultima hora."""
+    limite = time.time() - 3600
+    while _HORAS and _HORAS[0] < limite:
+        _HORAS.pop(0)
+    return len(_HORAS)
 
 
 def api(path, **params):
@@ -42,6 +51,7 @@ def api(path, **params):
         for intento in range(3):
             try:
                 LLAMADAS[0] += 1
+                _HORAS.append(time.time())
                 with urllib.request.urlopen(req, timeout=25) as r:
                     data = json.loads(r.read().decode())
                 if isinstance(data, dict) and str(data.get("success")) == "0":

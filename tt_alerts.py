@@ -23,6 +23,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+import tt_betsapi
 import tt_feed
 from tt_feed import fetch, build_groups, h2h
 from tt_engine import Group, Match
@@ -44,6 +45,12 @@ RUN = int(os.getenv("RUN_SECONDS", "320"))      # algo mas de 5 min: la siguient
 HOT = {"on": False, "ids": set()}   # partidos decisivos en juego
 FRESH = {}      # datos recientes de esos partidos (leidos uno a uno, mas rapidos)
 POLL_EVENT = int(os.getenv("POLL_EVENT", "8"))   # segundos entre lecturas del partido decisivo
+# Al final de un set importante del partido decisivo se mira mas a menudo,
+# siempre que este bot no pase de BETSAPI_MAX_HORA consultas en la ultima hora.
+POLL_EVENT_RAPIDO = int(os.getenv("POLL_EVENT_RAPIDO", "3"))
+BETSAPI_MAX_HORA = int(os.getenv("BETSAPI_MAX_HORA", "1100"))
+HOT_SETS = {}   # ultimo marcador en sets visto de cada partido decisivo
+LAST = {"events": None}   # ultima lista completa de partidos (para el aviso rapido)
 TEST = os.getenv("TEST_MODE", "1") == "1"
 REPORT_EVERY = 15 * 60
 STATE_FILE = os.getenv("STATE_FILE", "state.json")
@@ -1301,11 +1308,20 @@ def track_b(g, results, sent):
         print("WARN tipo B", ex)
 
 
-def tick():
-    HOT["on"] = False
-    HOT["ids"] = set()
-    tt_feed.ACUM = state.setdefault("acum_vivo", {})   # respaldo en vivo (Liga Pro)
-    events, live_total = fetch()
+def tick(rapido=None):
+    """Una vuelta completa. Con rapido=<id de partido>: AVISO RAPIDO, solo el grupo
+    de ese partido, con los datos que ya hay + la lectura fresca de ese partido (sin
+    consultar la lista entera ni hacer nada mas). Justo despues va la vuelta normal."""
+    if rapido:
+        if not LAST["events"]:
+            return
+        events = list(LAST["events"])
+    else:
+        HOT["on"] = False
+        HOT["ids"] = set()
+        tt_feed.ACUM = state.setdefault("acum_vivo", {})   # respaldo en vivo (Liga Pro)
+        events, live_total = fetch()
+        LAST["events"] = events
     if FRESH:
         # lo leido partido a partido es mas reciente que la lista del torneo
         by = {str(e.get("id")): e for e in events}
@@ -1325,6 +1341,9 @@ def tick():
             by[mid] = mix
         events = list(by.values())
     groups, parsed = build_groups(events)
+    if rapido:
+        groups = [g for g in groups if any(m.mid == rapido for m in g.matches)]
+        return _avisos(groups, rapido=True)
 
     if TEST and time.time() - state["last_report"] >= REPORT_EVERY:
         state["last_report"] = time.time()
@@ -1352,7 +1371,13 @@ def tick():
         vigilar_otros()
     except Exception as ex:                      # nunca debe afectar a los avisos
         print("WARN vigia", ex)
+    _avisos(groups, parsed)
 
+
+def _avisos(groups, parsed=None, rapido=False):
+    """Analiza los grupos y manda los avisos de picks. En modo rapido (justo al
+    acabar un set o el partido decisivo) solo lo urgente del grupo de ese partido:
+    confirmacion del pick y 🔔; lo demas lo hace la vuelta normal de justo despues."""
     sent = set(state["sent"])
 
     def once(key, text_fn):
@@ -1462,6 +1487,8 @@ def tick():
         # no los ve hasta que ese partido acaba (los puntos aun no existen). Se
         # prueban aqui, marcador a marcador, para avisar con antelacion igualmente.
         pend = g.pending()
+        if rapido:
+            continue                          # lo demas, en la vuelta normal
         if 2 <= len(pend) <= 3 and pend[1].live is None:
             pm, m = pend[0], pend[1]
             have = {r["pick"] for r in results if r["match"] is m}
@@ -1488,6 +1515,8 @@ def tick():
                     once(key, lambda tab=tab, m=m, pick=pick, vs=vs, p0=p0, p1=p1:
                          early_text(tab, m, pick, vs, p0, p1))
 
+    if rapido:
+        return
     # si se avisó "ATENTO" y ese pick ya no es posible, decirlo claro
     pstat = {p["id"]: p for p in parsed}
     for key, al in list(alerted.items()):
@@ -1590,26 +1619,62 @@ def main():
         wait = POLL_FAST if HOT["on"] else POLL
         if "--loop" not in sys.argv and time.time() + wait > end:
             break
-        if HOT["ids"] and watch_hot(wait):
-            continue                # el partido decisivo acaba de terminar: analizar YA
+        if HOT["ids"]:
+            mid = watch_hot(wait)
+            if mid:
+                # acaba de terminar el partido decisivo (o un set que lo puede cerrar):
+                # AVISO RAPIDO solo de ese grupo y, justo despues, la vuelta normal
+                try:
+                    tick(rapido=mid)
+                except Exception as ex:
+                    print("WARN aviso rapido", ex)
+                save_state()
+                continue
+            continue
         time.sleep(wait)
 
 
 def watch_hot(seconds):
-    """Vigila los partidos decisivos uno a uno cada POLL_EVENT segundos.
-    Devuelve True en cuanto alguno termina (para confirmar el pick al instante)."""
+    """Vigila los partidos decisivos uno a uno: cada POLL_EVENT segundos y, al final
+    de un set importante (el que deja a alguien a 2 sets o cierra el partido), cada
+    POLL_EVENT_RAPIDO. Devuelve el id
+    del partido en cuanto termina, o en cuanto acaba un set y queda 2-x (para el
+    🔔 al instante). Si no pasa nada en 'seconds', devuelve None."""
     stop = time.time() + seconds
     while time.time() < stop:
+        cierre = False
         for mid in list(HOT["ids"]):
             ev = tt_feed.event(mid)
             if ev is None:
-                return False        # funcion no disponible: ritmo normal
+                continue            # no se ha podido leer ahora: se reintenta enseguida
             FRESH[str(mid)] = ev
             if (ev.get("status") or {}).get("type") == "finished":
                 print("Partido decisivo terminado:", mid)
-                return True
-        time.sleep(POLL_EVENT)
-    return False
+                return mid
+            sets = (_n((ev.get("homeScore") or {}).get("current")),
+                    _n((ev.get("awayScore") or {}).get("current")))
+            antes = HOT_SETS.get(mid)
+            HOT_SETS[mid] = sets
+            if max(sets) >= 2 and antes is not None and antes != sets:
+                print("Set decisivo:", mid, sets)
+                return mid
+            # el set en juego esta avanzado (8+ puntos) y al acabar alguien queda
+            # a 2 sets o termina el partido: mirar cada pocos segundos
+            cur = sum(sets) + 1
+            pts = (_n((ev.get("homeScore") or {}).get(f"period{cur}")),
+                   _n((ev.get("awayScore") or {}).get(f"period{cur}")))
+            if max(sets) >= 1 and max(pts) >= 8:
+                cierre = True
+        rapido_ok = cierre and tt_betsapi.llamadas_hora() < BETSAPI_MAX_HORA
+        time.sleep(POLL_EVENT_RAPIDO if rapido_ok else POLL_EVENT)
+    return None
+
+
+def _n(v):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return 0
 
 
 if __name__ == "__main__":
