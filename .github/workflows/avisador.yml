@@ -2,7 +2,9 @@ name: Avisador TT Cup
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # el bot va encadenado (cada ejecucion deja lista la siguiente); esto es
+    # solo de reserva por si la cadena se cortara
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 concurrency:
@@ -11,17 +13,25 @@ concurrency:
 
 permissions:
   contents: write
+  actions: write          # para dejar en cola la siguiente ejecucion
 
 jobs:
   avisar:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 70     # cada ejecucion vigila ~55 min seguidos
     steps:
       # siempre la version MAS RECIENTE de main (no la del momento en que se
       # pidio la ejecucion): asi nunca se trabaja con un picks.csv atrasado
       - uses: actions/checkout@v4
         with:
           ref: main
+
+      # BOT SIEMPRE DESPIERTO: nada mas empezar deja en cola la siguiente
+      # ejecucion, que arranca en cuanto acaba esta (solo ~1 min de hueco por hora)
+      - name: Dejar lista la siguiente ejecucion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run avisador.yml --ref main -R "${{ github.repository }}" || echo "no se pudo encolar (la reserva cada 30 min lo cubre)"
 
       - uses: actions/setup-python@v5
         with:
@@ -48,6 +58,8 @@ jobs:
           BETSAPI_TOKEN: ${{ secrets.BETSAPI_TOKEN }}
           # sin filtro de noche: todos los OFICIALES se avisan a cualquier hora
           FILTRO_NOCHE: "0"
+          # ~55 min seguidos vigilando (la siguiente ejecucion ya espera en cola)
+          RUN_SECONDS: "3300"
         run: python tt_alerts.py
 
       - name: Guardar memoria
@@ -73,3 +85,4 @@ jobs:
             fi
             git push || true
           fi
+
