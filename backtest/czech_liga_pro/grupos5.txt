@@ -1,0 +1,24 @@
+👥 GRUPOS DE 5 · LIGA PRO (datos reales)
+
+Datos: BetsAPI, 60 días (269 consultas, 0 días con error) · 11748 partidos
+
+1) Grupos de 4: 1197 antes · ✅ TODOS EXACTAMENTE IGUALES ahora
+2) Grupos de 5 formados: 175 (los grupos 'dudosos por 5.º jugador' pasan de 178 a 2)
+   Duración típica de un grupo de 5: 4.5 h
+3) ¿Quién pasa a la final? El bot acierta 171/171 (100%) · con empate a puntos en el corte: 70/70 · sin final clara en los datos: 4
+4) PICKS OFICIALES que se habrían dado en grupos de 5: 33 · aciertos 23/33 (70%)
+   Con cuota de Bet365 (32): +7.58 u · yield +24% · cuota media 1.78
+   01/11 04:30 ✅ Parhomenko D. vs Kucirek O. @1.44 (partido 10/10)
+   02/11 04:30 ✅ Dvorak V. vs Chlebecek M. @1.73 (partido 10/10)
+   04/11 04:30 ✅ Regner T. vs Dolezal V. @2.10 (partido 10/10)
+   04/11 04:30 ✅ Vedmoch M. vs Zmuda P. (partido 10/10)
+   07/11 04:30 ✅ Darin K. vs Holovatiuk Y. @1.73 (partido 10/10)
+   08/11 04:30 ❌ Fojt P. vs Darin K. @1.67 (partido 10/10)
+   09/11 04:00 ✅ Steffan J. vs Dolezal V. @1.73 (partido 9/10)
+   12/11 04:30 ✅ Sobisek M. vs Hlawatschke A. @1.50 (partido 10/10)
+   15/11 04:30 ❌ Havrda L. vs Mutl D. @1.83 (partido 10/10)
+   15/11 04:30 ✅ Zuzanek J. vs Bayer A. @1.53 (partido 10/10)
+   17/11 04:30 ❌ Sopko M. vs Louda J. @1.91 (partido 10/10)
+   20/11 04:30 ❌ Ruzicka J. vs Huk M. @1.83 (partido 10/10)
+
+CONCLUSIÓN: los grupos de 4 no cambian nada; los de 5 se suman a Liga Pro.
