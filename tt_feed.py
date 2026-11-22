@@ -261,8 +261,14 @@ def fetch():
     if now.hour < 4:
         days.insert(0, (now - timedelta(days=1)).strftime("%Y-%m-%d"))
     if usa_betsapi():
+        # BetsAPI cuenta los dias en hora UTC: un partido de las 00:30 de aqui es
+        # del dia "de ayer". Un grupo que empieza antes de la 01:00 puede seguir
+        # hasta las 05:00-06:00, asi que el dia de ayer se pide hasta las 08:00.
+        dias_b = list(days)
+        if now.hour < 8 and len(dias_b) == 1:
+            dias_b.insert(0, (now - timedelta(days=1)).strftime("%Y-%m-%d"))
         try:
-            lista = tt_betsapi.eventos(TOURNAMENT_ID, days)
+            lista = tt_betsapi.eventos(TOURNAMENT_ID, dias_b)
             FUENTE["modo"] = "BetsAPI"
             ACUM["betsapi_ok"] = time.time()
             live = sum(1 for e in lista if e["status"]["type"] == "inprogress")

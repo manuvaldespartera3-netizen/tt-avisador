@@ -167,11 +167,14 @@ def eventos(sofascore_id, days, vivos=True):
         if tipo == "ended":
             for e in vivos_ahora:              # en juego (fresco) pisa a 'proximos'
                 evs[str(e.get("id"))] = e
+        hoy_utc = time.strftime("%Y%m%d", time.gmtime(ahora))
         for d in days:
             dd = d.replace("-", "")
             key = (tipo, liga, dd)
-            viejo = key not in _CACHE or ahora - _CACHE[key][0] > CACHE_S
-            if tipo == "ended" and not viejo:
+            # un dia UTC ya cerrado (hace mas de 1 h) casi no cambia: cada 30 min
+            cerrado = dd < hoy_utc and time.gmtime(ahora).tm_hour >= 1
+            viejo = key not in _CACHE or ahora - _CACHE[key][0] > (1800 if cerrado else CACHE_S)
+            if tipo == "ended" and not viejo and not cerrado:
                 # un partido que estaba en juego ya no lo esta y aun no sale entre
                 # los terminados guardados: pedirlos YA (resultado al instante)
                 hechos = {str(e.get("id")) for e in _CACHE[key][1]}
