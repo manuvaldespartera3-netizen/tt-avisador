@@ -50,6 +50,7 @@ POLL_EVENT = int(os.getenv("POLL_EVENT", "8"))   # segundos entre lecturas del p
 POLL_EVENT_RAPIDO = int(os.getenv("POLL_EVENT_RAPIDO", "3"))
 BETSAPI_MAX_HORA = int(os.getenv("BETSAPI_MAX_HORA", "1100"))
 HOT_SETS = {}   # ultimo marcador en sets visto de cada partido decisivo
+FIN_VISTO = {}  # lecturas seguidas en que el partido decisivo sale terminado
 LAST = {"events": None}   # ultima lista completa de partidos (para el aviso rapido)
 TEST = os.getenv("TEST_MODE", "1") == "1"
 REPORT_EVERY = 15 * 60
@@ -80,6 +81,7 @@ def load_state():
     for k, v in (state.get("urls") or {}).items():
         if v and not tt_feed.URLS.get(k):
             tt_feed.URLS[k] = v
+    tt_betsapi.cargar_nombres(state.get("nombres_bets"))   # nombres fijos de jugadores
 
 
 def load_picks():
@@ -102,6 +104,7 @@ def save_picks():
 def save_state():
     state["sent"] = state["sent"][-3000:]
     state["urls"] = dict(tt_feed.URLS)
+    state["nombres_bets"] = dict(tt_betsapi.NOMBRES)
     with open(STATE_FILE, "w") as f:
         json.dump(state, f)
 
@@ -595,8 +598,24 @@ def confirm_text(r, g, hh, early=False):
     txt += f"\n{hline}"
     if r["warn"]:
         txt += "\n⚠️ puede decidir por puntos"
+    if depende_de_puntos(g, r):
+        txt += "\n🔢 Lo decide un desempate por PUNTOS de los sets (dato de BetsAPI): algo más frágil"
     txt += f"\n🔎 Puntos: {table_line(g)}"
     return txt
+
+
+def depende_de_puntos(g, r):
+    """¿El pick solo es seguro gracias a los PUNTOS de los sets ya jugados? (sin
+    esos puntos, el desempate quedaria sin decidir)."""
+    try:
+        ms = [Match(x.a, x.b, x.order, time=x.time, final=x.final, live=x.live, mid=x.mid)
+              for x in g.matches]
+        g2 = Group(g.players, ms)
+        m2 = next(x for x in g2.matches if x.order == r["match"].order)
+        return not safe_pick(g2, m2, r["pick"], {})
+    except Exception as ex:
+        print("WARN depende_de_puntos", ex)
+        return False
 
 
 def late_text(r, cal):
@@ -1330,6 +1349,9 @@ def tick(rapido=None):
             # solo se usa si va IGUAL o MAS ADELANTADO que la lista (nunca un dato viejo)
             if not base or progress(ev) < progress(base):
                 continue
+            if (str(mid).startswith("b") and (ev.get("status") or {}).get("type") == "finished"
+                    and not tt_betsapi.aceptado(mid)):
+                continue                     # terminado aun sin confirmar: no se usa
             if ((ev.get("homeTeam") or {}).get("name") != (base.get("homeTeam") or {}).get("name")):
                 continue                     # datos de otro formato: no mezclar
             # de la lectura rapida solo se toman marcador y estado; jugadores y hora
@@ -1637,22 +1659,41 @@ def main():
 def watch_hot(seconds):
     """Vigila los partidos decisivos uno a uno: cada POLL_EVENT segundos y, al final
     de un set importante (el que deja a alguien a 2 sets o cierra el partido), cada
-    POLL_EVENT_RAPIDO. Devuelve el id
-    del partido en cuanto termina, o en cuanto acaba un set y queda 2-x (para el
-    🔔 al instante). Si no pasa nada en 'seconds', devuelve None."""
+    POLL_EVENT_RAPIDO. Devuelve el id del partido en cuanto termina DE VERDAD (BetsAPI
+    lo da por terminado, los sets cuadran uno a uno y se ve igual en 2 lecturas
+    seguidas), o en cuanto acaba un set y queda 2-x (para el 🔔 al instante).
+    Si no pasa nada en 'seconds', devuelve None."""
     stop = time.time() + seconds
     while time.time() < stop:
         cierre = False
+        confirmar = False
+        esperar_lista = False
         for mid in list(HOT["ids"]):
             ev = tt_feed.event(mid)
             if ev is None:
                 continue            # no se ha podido leer ahora: se reintenta enseguida
             FRESH[str(mid)] = ev
-            if (ev.get("status") or {}).get("type") == "finished":
-                print("Partido decisivo terminado:", mid)
-                return mid
-            sets = (_n((ev.get("homeScore") or {}).get("current")),
-                    _n((ev.get("awayScore") or {}).get("current")))
+            p = tt_feed.parse(ev)
+            if p and p["final"]:
+                FIN_VISTO[mid] = FIN_VISTO.get(mid, 0) + 1
+                if FIN_VISTO[mid] >= 2 and str(mid).startswith("b") and \
+                        tt_betsapi.sigue_en_juego(mid, tt_feed.TOURNAMENT_ID):
+                    print("Terminado en un sitio pero aun EN JUEGO en otro, se espera:", mid)
+                    esperar_lista = True
+                    continue
+                if FIN_VISTO[mid] >= 2:
+                    if str(mid).startswith("b"):
+                        tt_betsapi.aceptar(ev)   # 3 comprobaciones superadas
+                    print("Partido decisivo terminado:", mid, p["final"],
+                          json.dumps(tt_betsapi.CRUDO.get(str(mid)), ensure_ascii=False)[:600])
+                    FIN_VISTO[mid] = 0
+                    return mid
+                confirmar = True    # 2.a lectura enseguida, antes de dar nada por hecho
+                continue
+            FIN_VISTO[mid] = 0
+            if not p or not p["live"]:
+                continue
+            sets = p["live"]
             antes = HOT_SETS.get(mid)
             HOT_SETS[mid] = sets
             if max(sets) >= 2 and antes is not None and antes != sets:
@@ -1665,6 +1706,12 @@ def watch_hot(seconds):
                    _n((ev.get("awayScore") or {}).get(f"period{cur}")))
             if max(sets) >= 1 and max(pts) >= 8:
                 cierre = True
+        if confirmar:
+            time.sleep(1.5)
+            continue
+        if esperar_lista:
+            time.sleep(3)
+            continue
         rapido_ok = cierre and tt_betsapi.llamadas_hora() < BETSAPI_MAX_HORA
         time.sleep(POLL_EVENT_RAPIDO if rapido_ok else POLL_EVENT)
     return None

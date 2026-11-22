@@ -418,6 +418,29 @@ def parse(e):
         # y no debe frenar el pick.
         if max(sets_a, sets_b) == 3 and (sets_a, sets_b) != (sa, sb):
             dudoso = True
+        # BetsAPI: solo cuenta como TERMINADO si los sets juego a juego estan todos
+        # completos (11+ y 2 de diferencia) y dan exactamente el marcador final. Si
+        # aun no cuadran (dato a medias o erroneo) se trata como EN JUEGO y se espera.
+        hay_sets = any(hs.get(f"period{i}") is not None for i in range(1, 8))
+        if str(e.get("id", "")).startswith("b") and hay_sets:
+            fa = fb = 0
+            for i in range(1, 8):
+                x, y = hs.get(f"period{i}"), as_.get(f"period{i}")
+                if x is None or y is None:
+                    continue
+                x, y = _int(x), _int(y)
+                if max(x, y) >= 11 and abs(x - y) >= 2:
+                    fa, fb = fa + (x > y), fb + (y > x)
+            if (fa, fb) != (sa, sb):
+                print("Partido aun sin cerrar del todo en BetsAPI, se espera:",
+                      e.get("id"), f"{sa}-{sb}", f"(sets completos {fa}-{fb})")
+                final = points = None
+                st = "inprogress"
+                live = (min(fa, 2), min(fb, 2))
+                cur = fa + fb + 1
+                live_pts = _int(hs.get(f"period{cur}")) + _int(as_.get(f"period{cur}"))
+                done_pts = (sum(_int(hs.get(f"period{i}")) for i in range(1, cur)),
+                            sum(_int(as_.get(f"period{i}")) for i in range(1, cur)))
         wc = e.get("winnerCode")
         if wc in (1, 2) and (wc == 1) != (sa > sb):
             dudoso = True
