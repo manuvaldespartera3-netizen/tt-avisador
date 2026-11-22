@@ -38,6 +38,10 @@ try:
 except Exception:
     TZ = timezone(timedelta(hours=int(os.getenv("TZ_OFFSET", "1"))))
 WINDOW_H = 3.5
+# Grupos de 5 jugadores (Liga Pro, reglamento 2.7): solo si GRUPOS5=1. Con 0
+# (TT Cup) todo funciona exactamente igual que siempre.
+GRUPOS5 = os.getenv("GRUPOS5", "0") == "1"
+GRUPO5_MAX_H = 7.0          # duracion maxima de un grupo de 5 (10 partidos)
 UA = {"User-Agent": "Mozilla/5.0 tt-alerts"}
 
 # compatibilidad con tt_alerts.py
@@ -492,16 +496,7 @@ def build_groups(events):
         used |= {x["id"] for x in ms}
         hechos.append((set(four), max(x["t"] for x in ms)))
         ms.sort(key=lambda x: x["t"])
-        matches = [Match(x["a"], x["b"], i + 1,
-                         time=datetime.fromtimestamp(x["t"], TZ).strftime("%H:%M")
-                         + ("≈" if str(x["id"]).startswith("s") else ""),   # hora estimada
-                         final=x["final"], live=x["live"], points=x["points"], mid=x["id"],
-                         live_pts=x.get("live_pts", 0))
-                   for i, x in enumerate(ms)]
-        for mm, x in zip(matches, ms):
-            mm.done_pts = x.get("done_pts")      # puntos de sets terminados (en juego)
-        grp = Group(list(four), matches)
-        grp.dudoso = any(x.get("dudoso") for x in ms)
+        grp = _hacer_grupo(four, ms)
         # ¿grupo de 5? (Liga Pro los tiene): un 5.º jugador que se enfrenta en este
         # mismo tramo a 3 o mas de los 4. Entonces la tabla de 4 seria falsa.
         rivales = {}
@@ -524,4 +519,110 @@ def build_groups(events):
         if grp.quinto:
             grp.dudoso = True
         groups.append(grp)
+    if GRUPOS5:
+        groups = _grupos_de_5(groups, parsed)
     return groups, parsed
+
+
+def _hacer_grupo(players, ms):
+    """Group del motor con los partidos (ya ordenados por hora)."""
+    matches = [Match(x["a"], x["b"], i + 1,
+                     time=datetime.fromtimestamp(x["t"], TZ).strftime("%H:%M")
+                     + ("≈" if str(x["id"]).startswith("s") else ""),   # hora estimada
+                     final=x["final"], live=x["live"], points=x["points"], mid=x["id"],
+                     live_pts=x.get("live_pts", 0))
+               for i, x in enumerate(ms)]
+    for mm, x in zip(matches, ms):
+        mm.done_pts = x.get("done_pts")      # puntos de sets terminados (en juego)
+    grp = Group(list(players), matches)
+    grp.dudoso = any(x.get("dudoso") for x in ms)
+    return grp
+
+
+def _grupos_de_5(groups, parsed):
+    """Liga Pro (reglamento 2.7): grupos de 5 jugadores, todos contra todos (10
+    partidos), pasan los 2 primeros. Se buscan DESPUES de formar los de 4, solo con
+    partidos que no estan en ningun grupo de 4 bueno: los grupos de 4 no cambian.
+    Un grupo de 4 marcado como 'grupo de 5' (dudoso) se sustituye por el de 5 si
+    este cuadra al 100 %; si no cuadra, sigue dudoso y sin picks, como siempre."""
+    lim = GRUPO5_MAX_H * 3600
+    bloqueados = set()          # partidos de grupos de 4 buenos: intocables
+    for g in groups:
+        if not getattr(g, "quinto", None):
+            bloqueados |= {m.mid for m in g.matches}
+    libres = [x for x in parsed if x["id"] not in bloqueados]
+    tomados, nuevos = set(), []
+    for i, m in enumerate(libres):
+        if m["id"] in tomados:
+            continue
+        ven = [x for x in libres[i:] if x["t"] <= m["t"] + lim and x["id"] not in tomados]
+        rivales = {}
+        for x in ven:
+            rivales.setdefault(x["a"], set()).add(x["b"])
+            rivales.setdefault(x["b"], set()).add(x["a"])
+        a, b = m["a"], m["b"]
+        cands = sorted((rivales.get(a, set()) & rivales.get(b, set())) - {a, b})
+        hecho = None
+        for c, d, e in combinations(cands, 3):
+            if not (d in rivales.get(c, ()) and e in rivales.get(c, ()) and e in rivales.get(d, ())):
+                continue
+            ms10 = _grupo5({a, b, c, d, e}, m, ven, parsed)
+            if ms10:
+                hecho = ([a, b, c, d, e], ms10)
+                break
+        if not hecho:
+            continue
+        five, ms10 = hecho
+        tomados |= {x["id"] for x in ms10}
+        grp = _hacer_grupo(five, ms10)
+        grp.quinto = None
+        grp.cinco = True
+        nuevos.append(grp)
+    if not nuevos:
+        return groups
+    # fuera los grupos de 4 "dudosos por 5.º jugador" que eran en realidad este de 5
+    quedan = [g for g in groups if not (getattr(g, "quinto", None)
+                                        and {m.mid for m in g.matches} & tomados)]
+    return quedan + nuevos
+
+
+def _grupo5(five, m0, ven, parsed):
+    """Los 10 partidos del grupo de 5 que empieza con m0, o None si algo no cuadra
+    al 100 %:
+      - estan los 10 enfrentamientos (cada pareja, una sola vez)
+      - ningun otro partido entre esos 5 en medio (ni repetidos ni finales)
+      - ninguno de los 5 juega contra alguien de fuera mientras dura el grupo
+      - como mucho GRUPO5_MAX_H horas de principio a fin."""
+    lim = GRUPO5_MAX_H * 3600
+    opciones = []
+    for p, q in combinations(sorted(five), 2):
+        if {p, q} == {m0["a"], m0["b"]}:
+            cand = [m0]
+        else:
+            cand = sorted((x for x in ven if {x["a"], x["b"]} == {p, q}),
+                          key=lambda x: (x["t"], x["id"]))[:2]
+        if not cand:
+            return None
+        opciones.append(cand)
+    entre5 = [x for x in parsed if x["a"] in five and x["b"] in five
+              and m0["t"] - lim <= x["t"] <= m0["t"] + 2 * lim]
+
+    def valido(c10):
+        ts = sorted(x["t"] for x in c10)
+        t0, t1 = ts[0], ts[-1]
+        if t1 - t0 > lim:
+            return False
+        ids = {x["id"] for x in c10}
+        if any(x["id"] not in ids and t0 <= x["t"] <= t1 for x in entre5):
+            return False                       # otro partido entre ellos en medio
+        for x in parsed:
+            if t0 < x["t"] < t1 and (x["a"] in five) != (x["b"] in five):
+                return False                   # alguno juega con uno de fuera
+        return True
+
+    buenos = [list(c) for c in product(*opciones) if valido(c)]
+    if not buenos:
+        return None
+    mejor = min(buenos, key=lambda c: (max(x["t"] for x in c), sorted(x["id"] for x in c)))
+    mejor.sort(key=lambda x: (x["t"], x["id"]))
+    return mejor

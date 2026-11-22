@@ -326,10 +326,11 @@ def grupos_text(parsed, groups):
         jug = sum(1 for x in g.matches if x.final)
         vivo = next((x for x in g.matches if x.live is not None), None)
         flag = (f" ⚠️ grupo de 5 (con {g.quinto})" if getattr(g, "quinto", None)
-                else " ⚠️ datos dudosos" if getattr(g, "dudoso", False) else "")
+                else " ⚠️ datos dudosos" if getattr(g, "dudoso", False)
+                else " 👥 grupo de 5" if getattr(g, "cinco", False) else "")
         estado = f"jugando {vivo.a.split()[0]}–{vivo.b.split()[0]}" if vivo else "esperando"
         L.append(f"• {g.matches[0].time} {' · '.join(p.split()[0] for p in g.players)}: "
-                 f"{jug}/6 jugados, {estado}{flag}")
+                 f"{jug}/{len(g.matches)} jugados, {estado}{flag}")
     sueltos = [p for p in parsed if p["t"] > now - 3 * 3600 and
                not any(p["id"] in {x.mid for x in g.matches} for g in groups)]
     if sueltos:
@@ -350,7 +351,8 @@ def ver_text(name, parsed, groups):
     for g in gs:
         L.append("🔎 Grupo: " + " · ".join(g.players)
                  + (f" ⚠️ PARECE GRUPO DE 5 (con {g.quinto}): no se avisa" if getattr(g, "quinto", None)
-                    else " ⚠️ DATOS DUDOSOS (no se avisa)" if getattr(g, "dudoso", False) else ""))
+                    else " ⚠️ DATOS DUDOSOS (no se avisa)" if getattr(g, "dudoso", False)
+                    else " 👥 GRUPO DE 5 (pasan los 2 primeros)" if getattr(g, "cinco", False) else ""))
         for x in g.matches:
             if x.final:
                 st = f"{x.final[0]}-{x.final[1]}"
@@ -579,6 +581,8 @@ def confirm_text(r, g, hh, early=False):
         cuota = None
     hline = f"H2H {r['pick']} {hh[0]}-{hh[1]} {r['vs']}" if hh else "Sin H2H"
     txt = f"{head}\nvs {r['vs']} ({rival}){when}"
+    if getattr(g, "cinco", False):
+        txt += "\n👥 Grupo de 5 (pasan los 2 primeros)"
     if cuota:
         txt += f"\n💶 Apuesta solo con cuota ≥ {cuota}"
     txt += f"\n{hline}"
