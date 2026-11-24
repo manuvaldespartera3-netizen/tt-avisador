@@ -214,16 +214,33 @@ def aceptar(ev):
     _VISTO[ev["id"]] = ev
 
 
+def _sets_de(e):
+    """Los sets juego a juego tal cual los da BetsAPI (para comparar dos lecturas)."""
+    sc = e.get("scores") or {}
+    out = []
+    for k in sorted(sc, key=lambda x: int(x) if str(x).isdigit() else 99):
+        try:
+            out.append((int(sc[k].get("home") or 0), int(sc[k].get("away") or 0)))
+        except (TypeError, ValueError, AttributeError):
+            pass
+    return tuple(out)
+
+
 def sigue_en_juego(mid, sofascore_id):
-    """¿Sale todavia en la lista de partidos EN JUEGO de BetsAPI? (comprobacion
-    cruzada: un partido solo es terminado si las dos listas de BetsAPI coinciden).
-    Si no se puede leer, se responde que si (por seguridad: se espera)."""
+    """Comprobacion cruzada con la lista de partidos EN JUEGO de BetsAPI: True si el
+    partido sale ahi con OTRO marcador juego a juego (o sea, aun se esta jugando y
+    el 'terminado' no cuadra). Si sale con el mismo marcador final es solo que la
+    lista tarda en quitarlo: eso no frena el aviso. Si no se puede leer: True."""
     liga = LIGAS.get(str(sofascore_id), str(sofascore_id))
     try:
         res = api("/v3/events/inplay", sport_id=SPORT, league_id=liga).get("results") or []
     except Exception:
         return True
-    return str(mid).lstrip("b") in {str(e.get("id")) for e in res}
+    vivo = next((e for e in res if str(e.get("id")) == str(mid).lstrip("b")), None)
+    if vivo is None:
+        return False
+    ref = CRUDO.get(str(mid)) or {}
+    return _sets_de(vivo) != _sets_de(ref)
 
 
 def eventos(sofascore_id, days, vivos=True):
@@ -239,6 +256,7 @@ def eventos(sofascore_id, days, vivos=True):
                                    .get("results") or [])
                        if str((e.get("league") or {}).get("id")) == liga]
     ids_vivos = {str(e.get("id")) for e in vivos_ahora}
+    vivos_por_id = {str(e.get("id")): e for e in vivos_ahora}
     evs = {}
     for tipo in ("upcoming", "ended"):        # orden: proximos < en juego < terminados
         if tipo == "ended":
@@ -260,9 +278,10 @@ def eventos(sofascore_id, days, vivos=True):
                 _CACHE[key] = (ahora, _paginas(f"/v3/events/{tipo}", sport_id=SPORT,
                                                league_id=liga, day=dd))
             for e in _CACHE[key][1]:
-                if tipo == "ended" and str(e.get("id")) in ids_vivos:
-                    continue                  # sigue en la lista de EN JUEGO: aun no
-                                              # se da por terminado (las listas no cuadran)
+                v = vivos_por_id.get(str(e.get("id")))
+                if tipo == "ended" and v is not None and _sets_de(v) != _sets_de(e):
+                    continue                  # sale EN JUEGO con otro marcador: las dos
+                                              # listas no cuadran, aun no se da por terminado
                 evs[str(e.get("id"))] = e     # 'terminados' (va al final) pisa a todo
     _registrar(evs.values())
     if vivos:

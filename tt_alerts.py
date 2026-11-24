@@ -51,6 +51,7 @@ POLL_EVENT_RAPIDO = int(os.getenv("POLL_EVENT_RAPIDO", "3"))
 BETSAPI_MAX_HORA = int(os.getenv("BETSAPI_MAX_HORA", "1100"))
 HOT_SETS = {}   # ultimo marcador en sets visto de cada partido decisivo
 FIN_VISTO = {}  # lecturas seguidas en que el partido decisivo sale terminado
+FIN_T = {}      # cuando se vio terminado por primera vez (para el registro)
 LAST = {"events": None}   # ultima lista completa de partidos (para el aviso rapido)
 TEST = os.getenv("TEST_MODE", "1") == "1"
 REPORT_EVERY = 15 * 60
@@ -624,7 +625,8 @@ def late_text(r, cal):
     sa, sb = m.live or (0, 0)
     star = "⭐ " if cal == "estrella" else ""
     cuota = CUOTA_ESTRELLA if cal == "estrella" else CUOTA_NORMAL
-    return (f"✅ SE CUMPLIÓ → {star}PICK OFICIAL {r['pick'].upper()} vs {r['vs']} · {m.time}\n"
+    tipo = "🟡 PICK CASI SEGURO" if r.get("casi") else "PICK OFICIAL"
+    return (f"✅ SE CUMPLIÓ → {star}{tipo} {r['pick'].upper()} vs {r['vs']} · {m.time}\n"
             f"🔴 El partido ya ha empezado ({m.a} {sa}-{sb} {m.b} en sets).\n"
             f"Si apostaste con el 🔔, está bien hecho. Si no, solo en vivo y con cuota ≥ {cuota}.\n"
             f"✍️ Responde con tu cuota (ej. 1.45) o 'no'")
@@ -647,12 +649,12 @@ def register_pick(r, hh, early=False, cal="", enviado=True, msg_id=None):
     if any(p.get("match_id") == m.mid and p.get("pick") == r["pick"]
            and p.get("tipo") != "OFICIAL B" for p in picks):
         return          # ya estaba apuntado (nunca dos veces el mismo pick)
-    cuota_sofa = odds_now(m.mid, r["pick"] == m.a) if kind(r) == "OFICIAL" else ""
+    cuota_sofa = odds_now(m.mid, r["pick"] == m.a) if kind(r) == "OFICIAL" else ""   # (incluye CASI)
     picks.append({"cuota_aviso": cuota_sofa,
                   "momento": "vivo" if early else "antes", "msg_id": msg_id or "",
                   "calidad": cal, "enviado": "si" if enviado else "no",
                   "fecha": datetime.now(tt_feed.TZ).strftime("%Y-%m-%d"), "hora": m.time,
-                  "tipo": kind(r), "pick": r["pick"], "rival": r["vs"],
+                  "tipo": "CASI" if r.get("casi") else kind(r), "pick": r["pick"], "rival": r["vs"],
                   "h2h_pick": hh[0] if hh else "", "h2h_rival": hh[1] if hh else "",
                   "aviso_puntos": "si" if r["warn"] else "no",
                   "match_id": m.mid, "resultado": "", "marcador": ""})
@@ -675,7 +677,7 @@ def update_results(parsed):
             won = (sa > sb) if pick_home else (sb > sa)
             pk["resultado"] = "G" if won else "P"
             pk["marcador"] = f"{sa}-{sb}" if pick_home else f"{sb}-{sa}"
-            if pk.get("tipo") == "OFICIAL" and not pk.get("cuota_cierre"):
+            if pk.get("tipo") in ("OFICIAL", "CASI") and not pk.get("cuota_cierre"):
                 pk["cuota_cierre"] = odds_now(pk["match_id"], pick_home)
                 if not pk.get("cuota_aviso"):
                     pk["cuota_aviso"] = pk["cuota_cierre"]
@@ -689,7 +691,7 @@ def update_results(parsed):
     for pk in picks:
         if hechos >= 3:
             break
-        if (pk.get("tipo") == "OFICIAL" and pk.get("resultado") in ("G", "P")
+        if (pk.get("tipo") in ("OFICIAL", "CASI") and pk.get("resultado") in ("G", "P")
                 and str(pk.get("match_id", "")).startswith("b") and not pk.get("cuota_cierre")
                 and not pk.get("_sin_cuota")):
             hechos += 1
@@ -774,6 +776,7 @@ def summary_text(today):
     lines.append("")
     lines.append(_line("TOTAL avisados", env))
     lines.append(_line("  🟢 OFICIAL", [p for p in env if p.get("tipo") == "OFICIAL"]))
+    lines.append(_line("  🟡 CASI SEGURO", [p for p in env if p.get("tipo") == "CASI"]))
     lines.append(_line("  ⭐ ESTRELLA", [p for p in env if p.get("calidad") == "estrella"]))
     lines.append(_line("  🟢 normal", [p for p in env if p.get("calidad") == "normal"]))
     fav = [p for p in env if p.get("h2h_pick") not in ("", None)
@@ -1074,6 +1077,67 @@ def _pts_scan(r, g, pm, f):
     return f"{cond} · {expl}"
 
 
+CASI = os.getenv("CASI", "1") == "1"     # avisar los 🟡 PICK CASI SEGURO
+
+
+def _marc(f, pick, m):
+    """Marcador del partido m visto desde 'pick' (p. ej. '3-1')."""
+    a, b = (f[0], f[1]) if pick == m.a else (f[1], f[0])
+    return f"{a}-{b}"
+
+
+def casi_pick(g, m, pick, fixed):
+    """🟡 PICK CASI SEGURO: el rival esta ELIMINADO pase lo que pase, si el pick
+    pierde queda fuera, y ganando pasa SEGURO con 2 de los 3 marcadores (con el
+    otro, lo deciden los puntos u otros resultados). Devuelve la descripcion o None."""
+    if not CASI:
+        return None
+    vs = m.b if pick == m.a else m.a
+    fins = m.possible_finals()
+    gana = [f for f in fins if (f[0] > f[1]) == (pick == m.a)]
+    pierde = [f for f in fins if f not in gana]
+    if not gana or not pierde:
+        return None
+
+    def st(p, permitidos):
+        fx = dict(fixed)
+        fx[m.order] = permitidos
+        return {x[p] for _, x in g.completions(fx)}
+    if st(vs, fins) != {"O"}:
+        return None
+    nl = st(pick, pierde)
+    if not (nl <= {"O", "A"} and "O" in nl):
+        return None
+    seguros, dudas = [], []
+    for f in gana:
+        x = st(pick, [f])
+        (seguros if x == {"Q"} else dudas).append((f, x))
+    if len(seguros) < 2 or not dudas:
+        return None
+    ok = " o ".join(_marc(f, pick, m) for f, _ in seguros)
+    partes = []
+    for f, x in dudas:
+        if x == {"O"}:
+            partes.append(f"con {_marc(f, pick, m)} quedaría fuera")
+        elif "A" in x:
+            partes.append(f"con {_marc(f, pick, m)} lo deciden los puntos")
+        else:
+            partes.append(f"con {_marc(f, pick, m)} depende de otros resultados")
+    return f"pasa seguro si gana {ok}; " + "; ".join(partes)
+
+
+def casi_text(r, g, early=False):
+    m = r["match"]
+    when = f" · {m.time}" if m.time else ""
+    if early:
+        when += "\n🔴 YA EMPEZADO (1.er set): solo si aún puedes apostar en vivo"
+    return (f"🟡🟡 PICK CASI SEGURO: {r['pick'].upper()} 🟡🟡\n"
+            f"vs {r['vs']} (eliminado){when}\n"
+            f"✔️ {r['casi'][0].upper()}{r['casi'][1:]}. Si pierde, fuera.\n"
+            f"💶 Apuesta solo con cuota ≥ {CUOTA_NORMAL}\n"
+            f"🔎 Puntos: {table_line(g)}")
+
+
 def outcome(r, g, pm, f):
     """Que pasa con el pick si el partido decisivo 'pm' acaba exactamente 'f'.
     Devuelve (simbolo, texto). ❓ = pick solo con una condicion de puntos (el texto la dice)."""
@@ -1088,6 +1152,9 @@ def outcome(r, g, pm, f):
         elif sc != "no":
             return "❓", sc
         else:
+            c = casi_pick(g, m, r["pick"], {pm.order: [f]})
+            if c:
+                return "🟡", f"pick CASI seguro: {c} (cuota ≥ {CUOTA_NORMAL})"
             r3 = g._eval_match(m, {pm.order: [f]})
             return "❌", ("lo deciden los puntos" if r3 and r3["pick"] == r["pick"]
                          else "no hay pick seguro")
@@ -1191,6 +1258,7 @@ def preview_text(r, pm, g):
         si = [f for f, o in res if o[0] == "✅"]
         no = [f for f, o in res if o[0] == "❌"]
         cond = [(f, o[1]) for f, o in res if o[0] == "❓"]
+        casi = [(f, o[1]) for f, o in res if o[0] == "🟡"]
         def marc(fs):
             return " o ".join(f"{max(f)}-{min(f)}" for f in fs)
         if len(si) == len(res):
@@ -1207,6 +1275,8 @@ def preview_text(r, pm, g):
             lines.append(f"❓ {nom} gana {max(f)}-{min(f)} → {cond_}")
             if expl:
                 lines.append(f"   ({expl})")
+        for f, txt in casi:
+            lines.append(f"🟡 {nom} gana {max(f)}-{min(f)} → {txt}")
         if no:
             lines.append(f"❌ {nom} gana {marc(no)} → no hay pick")
     lines.append("Aún NO apuestes: te confirmo en cuanto acabe ese partido (con los puntos reales).")
@@ -1234,6 +1304,9 @@ def closing_set_text(r, pm, g):
         elif sym == "❓":
             lines.append(f"❓ Si gana {p} ({res}) → {txt.replace('PICK', 'PICK OFICIAL ' + r['pick'].upper())}"
                          f" · espera: te confirmo al acabar")
+        elif sym == "🟡":
+            lines.append(f"🟡 Si gana {p} ({res}) → {txt.replace('pick CASI', 'PICK CASI').replace('PICK CASI seguro', 'PICK CASI SEGURO ' + r['pick'].upper())}"
+                         f" · apuesta YA")
         else:
             lines.append(f"❌ Si gana {p} ({res}) → NO apuestes ({txt})")
     if min(sa, sb) < 2:
@@ -1415,7 +1488,7 @@ def _avisos(groups, parsed=None, rapido=False):
         if pm.final or len(g.pending()) > 3:
             return      # grupo aun al principio: no hay picks posibles y saldria carisimo
         outs = {f: outcome(r, g, pm, f) for f in pm.possible_finals()}
-        if not any(o[0] in ("✅", "❓") for o in outs.values()):
+        if not any(o[0] in ("✅", "❓", "🟡") for o in outs.values()):
             return
         akey = f"{m.mid}|{r['pick']}"
         if pm.live is not None:
@@ -1455,13 +1528,25 @@ def _avisos(groups, parsed=None, rapido=False):
             continue
         checked |= {m.mid for m in g.matches}
         results = g.analyze()
-        track_b(g, results, sent)
+        todos = list(results)            # sin filtrar (para el seguimiento OFICIAL B)
         # fuera los "picks" en los que ganar NO asegura el pase (dudas por puntos)
         results = [r for r in results if not (r["warn"] and kind(r) == "OFICIAL" and
                    not win_sure(g, r["match"], r["pick"],
                                 {pm.order: [f for f in pm.possible_finals()
                                             if (f[0] > f[1]) == (w == pm.a)]
                                  for pm, w in r["conds"]}))]
+        # 🟡 PICK CASI SEGURO en el siguiente partido (si no es ya oficial)
+        pend0 = g.pending()[0]
+        if not any(r["match"] is pend0 and not r["conds"] for r in results):
+            for pick in (pend0.a, pend0.b):
+                c = casi_pick(g, pend0, pick, {})
+                if c:
+                    vs = pend0.b if pick == pend0.a else pend0.a
+                    rc = dict(match=pend0, conds=[], partial=False, pick=pick, vs=vs,
+                              reason=f"{vs} ya eliminado", warn=True, casi=c)
+                    results.append(rc)
+                    todos.append(rc)
+        track_b(g, todos, sent)         # OFICIAL B (solo seguimiento) si no hay otro pick
         for r in results:
             cands.add(f"{r['match'].mid}|{r['pick']}")
             if not r["conds"]:
@@ -1482,6 +1567,8 @@ def _avisos(groups, parsed=None, rapido=False):
                 key = f"C|{akey}"
                 if not r["conds"] and akey in alerted and key not in sent:
                     cal = quality(r, g) if kind(r) == "OFICIAL" else ""
+                    if r.get("casi"):
+                        cal = "casi"
                     sent.add(key)
                     state["sent"].append(key)
                     mid_tg = send(late_text(r, cal))
@@ -1493,6 +1580,8 @@ def _avisos(groups, parsed=None, rapido=False):
                 if key not in sent:
                     k = kind(r)
                     cal = quality(r, g) if k == "OFICIAL" else ""
+                    if r.get("casi"):
+                        cal = "casi"
                     avisar = (k == "OFICIAL" and cal != "noche") or \
                              (k == "POTENCIAL" and AVISAR_POTENCIAL)
                     sent.add(key)
@@ -1500,8 +1589,8 @@ def _avisos(groups, parsed=None, rapido=False):
                     hh, mid_tg = None, None
                     if avisar:
                         hh = h2h_for(m, r["pick"])
-                        mid_tg = send(confirm_text(r, g, hh, early)
-                                      + "\n✍️ Responde con tu cuota (ej. 1.45) o 'no'")
+                        txt = casi_text(r, g, early) if r.get("casi") else confirm_text(r, g, hh, early)
+                        mid_tg = send(txt + "\n✍️ Responde con tu cuota (ej. 1.45) o 'no'")
                     register_pick(r, hh, early, cal, avisar, mid_tg)
             elif len(r["conds"]) == 1 and m.live is None:
                 cond_alert(r, m, r["conds"][0][0], g)
@@ -1562,7 +1651,7 @@ def _avisos(groups, parsed=None, rapido=False):
                               reason=al.get("reason", f"{al['vs']} ya eliminado"),
                               warn=False, conds=[(px, "")])
                     outs = [outcome(rx, gx, px, f)[0] for f in px.possible_finals()]
-                    if "✅" in outs or "❓" in outs:
+                    if "✅" in outs or "❓" in outs or "🟡" in outs:
                         al["ts"] = time.time()
                         if px.live and max(px.live) == 2:
                             once(f"F|{mid_pick}|{al['pick']}|{px.mid}|{px.live[0]}-{px.live[1]}",
@@ -1676,6 +1765,8 @@ def watch_hot(seconds):
             p = tt_feed.parse(ev)
             if p and p["final"]:
                 FIN_VISTO[mid] = FIN_VISTO.get(mid, 0) + 1
+                if FIN_VISTO[mid] == 1:
+                    FIN_T[mid] = time.time()
                 if FIN_VISTO[mid] >= 2 and str(mid).startswith("b") and \
                         tt_betsapi.sigue_en_juego(mid, tt_feed.TOURNAMENT_ID):
                     print("Terminado en un sitio pero aun EN JUEGO en otro, se espera:", mid)
@@ -1685,6 +1776,7 @@ def watch_hot(seconds):
                     if str(mid).startswith("b"):
                         tt_betsapi.aceptar(ev)   # 3 comprobaciones superadas
                     print("Partido decisivo terminado:", mid, p["final"],
+                          f"(confirmado en {time.time() - FIN_T.get(mid, time.time()):.0f} s)",
                           json.dumps(tt_betsapi.CRUDO.get(str(mid)), ensure_ascii=False)[:600])
                     FIN_VISTO[mid] = 0
                     return mid
