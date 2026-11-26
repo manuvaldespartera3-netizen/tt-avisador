@@ -132,4 +132,5 @@ fecha,hora,tipo,pick,rival,h2h_pick,h2h_rival,aviso_puntos,match_id,resultado,ma
 2026-11-25,18:30,OFICIAL,Andrle T.,Stefek M.,,,no,b13503743,G,3-2,antes,normal,si,1.70,120,741,1.73,1.36
 2026-11-25,22:30,POTENCIAL,Kern L.,Benek J.,,,no,b13504780,P,2-3,antes,,no,,,,,
 2026-11-25,22:30,OFICIAL,Kuba V.,Jungman F.,,,no,b13505024,G,3-0,antes,normal,si,1.71,120,755,1.73,1.57
-2026-11-26,03:30,OFICIAL B,Bayer A.,Sobisek M.,,,,b13504733,,,antes,,no,,,,,
+2026-11-26,03:30,OFICIAL B,Bayer A.,Sobisek M.,,,,b13504733,G,3-2,antes,,no,,,,,
+2026-11-26,04:30,OFICIAL,Zmuda P.,Sobisek M.,,,si,b13505031,,,antes,normal,si,,,763,1.61,
