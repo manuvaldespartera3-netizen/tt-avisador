@@ -152,5 +152,7 @@ fecha,hora,tipo,pick,rival,h2h_pick,h2h_rival,aviso_puntos,match_id,resultado,ma
 2026-11-25,23:25,POTENCIAL,Dohnal J.,Cousin J.,,,no,b13508603,G,3-2,antes,,no,,,,,
 2026-11-26,10:35,OFICIAL,Neterda R.,Flesar M.,,,no,b13511455,P,0-3,antes,estrella,si,1.40,120,1143,1.44,1.50
 2026-11-26,11:25,OFICIAL,Kocab J.,Cerny M.,,,no,b13511432,G,3-0,antes,estrella,si,2.99,120,1147,2.75,2.75
-2026-11-26,18:10,OFICIAL,Dokoupil J.,Makara N.,,,no,b13513439,,,antes,estrella,si,1.33,120,1163,1.33,
-2026-11-26,18:15,POTENCIAL,Zaskodny M.,Gembala J.,,,no,b13513970,,,antes,,no,,,,,
+2026-11-26,18:10,OFICIAL,Dokoupil J.,Makara N.,,,no,b13513439,G,3-2,antes,estrella,si,1.33,120,1163,1.33,1.25
+2026-11-26,18:15,POTENCIAL,Zaskodny M.,Gembala J.,,,no,b13513970,P,2-3,antes,,no,,,,,
+2026-11-26,18:50,OFICIAL,Dvorak M.,Sochor M.,,,no,b13513638,,,antes,estrella,si,1.51,120,1171,1.67,
+2026-11-26,18:55,POTENCIAL,Kadavy O.,Bochnak D.,,,no,b13513567,,,vivo,,no,,,,,
