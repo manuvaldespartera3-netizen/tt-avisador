@@ -135,5 +135,5 @@ fecha,hora,tipo,pick,rival,h2h_pick,h2h_rival,aviso_puntos,match_id,resultado,ma
 2026-11-26,03:30,OFICIAL B,Bayer A.,Sobisek M.,,,,b13504733,G,3-2,antes,,no,,,,,
 2026-11-26,04:30,OFICIAL,Zmuda P.,Sobisek M.,,,si,b13505031,G,3-1,antes,normal,si,,,763,1.61,1.61
 2026-11-26,18:30,OFICIAL,Polasek R.,Vavrecka M.,,,no,b13508896,G,3-1,antes,normal,si,1.59,120,781,1.57,1.44
-2026-11-26,22:30,OFICIAL,Hanel P.,Becak M.,,,no,b13516261,,,antes,normal,si,2.00,120,792,,
-2026-11-26,22:30,OFICIAL,Simecek J.,Kypr T.,,,si,b13509363,,,antes,normal,si,2.04,120,799,2.50,
+2026-11-26,22:30,OFICIAL,Hanel P.,Becak M.,,,no,b13516261,P,1-3,antes,normal,si,2.00,120,792,,
+2026-11-26,22:30,OFICIAL,Simecek J.,Kypr T.,,,si,b13509363,P,2-3,antes,normal,si,2.04,120,799,2.50,2.20
